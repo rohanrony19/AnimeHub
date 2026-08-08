@@ -25,6 +25,10 @@ public class S3StorageService {
     private String region;
 
     public String uploadImage(MultipartFile file, String folder, String fileName) throws IOException {
+    	
+    	if (file.isEmpty()) {
+    	    throw new IllegalArgumentException("File is empty");
+    	}
 
         String key = "animehub/" + folder + "/" + fileName;
 
@@ -34,10 +38,16 @@ public class S3StorageService {
                 .contentType(file.getContentType())
                 .build();
 
-        s3Client.putObject(
-                putObjectRequest,
-                RequestBody.fromBytes(file.getBytes())
-        );
+        try (var inputStream = file.getInputStream()) {
+
+            s3Client.putObject(
+                    putObjectRequest,
+                    RequestBody.fromInputStream(
+                            inputStream,
+                            file.getSize()
+                    )
+            );
+        }
 
         return String.format(
                 "https://%s.s3.%s.amazonaws.com/%s",
@@ -48,6 +58,10 @@ public class S3StorageService {
     }
     
     public String uploadTrailer(MultipartFile file, String animeTitle) throws IOException {
+    	
+    	if (file.isEmpty()) {
+    	    throw new IllegalArgumentException("File is empty");
+    	}
 
         String key = String.format(
                 "animehub/%s/Trailer/Official-Trailer.%s",
@@ -61,10 +75,16 @@ public class S3StorageService {
                 .contentType(file.getContentType())
                 .build();
 
-        s3Client.putObject(
-                request,
-                RequestBody.fromBytes(file.getBytes())
-        );
+        try (var inputStream = file.getInputStream()) {
+
+            s3Client.putObject(
+                    request,
+                    RequestBody.fromInputStream(
+                            inputStream,
+                            file.getSize()
+                    )
+            );
+        }
 
         return String.format(
                 "https://%s.s3.%s.amazonaws.com/%s",
@@ -88,6 +108,10 @@ public class S3StorageService {
             String animeTitle,
             Integer seasonNumber,
             Integer episodeNumber) throws IOException {
+    	
+    	if (file.isEmpty()) {
+    	    throw new IllegalArgumentException("File is empty");
+    	}
 
         String key = String.format(
                 "animehub/%s/Season-%d/Episode-%d.%s",
@@ -103,10 +127,16 @@ public class S3StorageService {
                 .contentType(file.getContentType())
                 .build();
 
-        s3Client.putObject(
-                request,
-                RequestBody.fromBytes(file.getBytes())
-        );
+        try (var inputStream = file.getInputStream()) {
+
+            s3Client.putObject(
+                    request,
+                    RequestBody.fromInputStream(
+                            inputStream,
+                            file.getSize()
+                    )
+            );
+        }
 
         return String.format(
                 "https://%s.s3.%s.amazonaws.com/%s",
