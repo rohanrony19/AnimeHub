@@ -22,7 +22,7 @@ function VerifyOtp() {
         otp,
       });
 
-      toast.success(response);
+      toast.success(response.message);
 
       navigate("/reset-password", {
         state: { email },
