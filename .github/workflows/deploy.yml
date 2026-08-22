@@ -31,23 +31,49 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: Copy JAR to EC2
-        uses: appleboy/scp-action@v1
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
-          port: ${{ secrets.EC2_PORT }}
-          source: "Backend/target/animehub-0.0.1-SNAPSHOT.jar"
-          target: "/home/ubuntu/AnimeHub/Backend/target"
+      - name: Upload JAR to S3
+        run: |
+          aws s3 cp \
+            Backend/target/animehub-0.0.1-SNAPSHOT.jar \
+            s3://${{ secrets.AWS_S3_BUCKET }}/deploy/animehub-${{ github.sha }}.jar
 
-      - name: Deploy and restart application
-        uses: appleboy/ssh-action@v1
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
-          port: ${{ secrets.EC2_PORT }}
-          script: |
-            sudo systemctl restart animehub
-            sudo systemctl is-active animehub
+      - name: Deploy JAR through AWS SSM
+        run: |
+          COMMAND_ID=$(aws ssm send-command \
+            --instance-ids i-02d81ff291e9ac263 \
+            --document-name "AWS-RunShellScript" \
+            --parameters 'commands=[
+              "aws s3 cp s3://${{ secrets.AWS_S3_BUCKET }}/deploy/animehub-${{ github.sha }}.jar /home/ubuntu/AnimeHub/Backend/target/animehub-0.0.1-SNAPSHOT.jar",
+              "sudo systemctl restart animehub",
+              "sudo systemctl is-active animehub"
+            ]' \
+            --query "Command.CommandId" \
+            --output text)
+
+          echo "SSM Command ID: $COMMAND_ID"
+
+          aws ssm wait command-executed \
+            --command-id "$COMMAND_ID" \
+            --instance-id i-02d81ff291e9ac263
+
+          STATUS=$(aws ssm get-command-invocation \
+            --command-id "$COMMAND_ID" \
+            --instance-id i-02d81ff291e9ac263 \
+            --query "Status" \
+            --output text)
+
+          echo "Deployment status: $STATUS"
+
+          if [ "$STATUS" != "Success" ]; then
+            echo "Deployment failed."
+
+            aws ssm get-command-invocation \
+              --command-id "$COMMAND_ID" \
+              --instance-id i-02d81ff291e9ac263 \
+              --query "StandardErrorContent" \
+              --output text
+
+            exit 1
+          fi
+
+          echo "AnimeHub deployed successfully."
