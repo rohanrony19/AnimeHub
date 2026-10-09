@@ -5,7 +5,7 @@ import Footer from "../components/Footer";
 import AnimeCard from "../components/JikanAnimeCard";
 import DatabaseAnimeCard from "../components/DatabaseAnimeCard";
 
-import { searchAnime } from "../services/anime/jikanService";
+import { searchAnimeList } from "../services/anime/jikanService";
 import { searchDatabaseAnime } from "../services/anime/searchService";
 
 function SearchPage() {
@@ -13,21 +13,24 @@ function SearchPage() {
 
   const [animeList, setAnimeList] = useState([]);
 const [databaseAnime, setDatabaseAnime] = useState([]);
+const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetchAnime();
   }, [keyword]);
 
   const fetchAnime = async () => {
+  setLoading(true);
+
   try {
-    const [dbAnime, jikanAnime] = await Promise.all([
-      searchDatabaseAnime(keyword),
-      searchAnime(keyword),
-    ]);
+    const dbAnime = await searchDatabaseAnime(keyword);
 
     setDatabaseAnime(dbAnime);
+    setLoading(false);
 
-    const filteredJikan = jikanAnime.filter(
+    const externalAnime = await searchAnimeList(keyword);
+
+    const filteredExternal = externalAnime.filter(
       (anime) =>
         !dbAnime.some(
           (db) =>
@@ -36,10 +39,10 @@ const [databaseAnime, setDatabaseAnime] = useState([]);
         )
     );
 
-    setAnimeList(filteredJikan);
-
+    setAnimeList(filteredExternal);
   } catch (error) {
-    console.log(error);
+    console.error("Search failed:", error);
+    setLoading(false);
   }
 };
 
@@ -54,6 +57,11 @@ const [databaseAnime, setDatabaseAnime] = useState([]);
 
         <div className="grid md:grid-cols-4 lg:grid-cols-5 gap-8">
           <>
+          {loading && (
+  <div className="col-span-full text-center text-gray-400 py-10">
+    Searching anime...
+  </div>
+)}
   {databaseAnime.map((anime) => (
     <DatabaseAnimeCard
       key={anime.id}

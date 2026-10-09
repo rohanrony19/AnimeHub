@@ -1,11 +1,9 @@
-import { useNavigate } from "react-router-dom";
 
 function ProfileAnimeCard({
   image,
   title,
   subtitle,
   extra,
-  watchLink,
   onWatch,
   watchText = "Watch",
   removeText = "Remove",
@@ -13,15 +11,14 @@ function ProfileAnimeCard({
   progress = null,
   watchedText = null,
 }) {
-  const navigate = useNavigate();
   return (
     <div className="flex bg-[#1A2035] rounded-3xl overflow-hidden border border-slate-700 hover:border-violet-500 transition">
 
       <img
-        src={image}
-        alt={title}
-        className="w-24 h-36 object-cover"
-      />
+  src={image}
+  alt={title}
+  className="w-24 self-stretch object-cover block flex-shrink-0"
+/>
 
       <div className="flex-1 p-4 flex flex-col">
 
@@ -54,7 +51,7 @@ function ProfileAnimeCard({
   </div>
 )}
 
-        <div className="mt-auto flex gap-3">
+        <div className="mt-3 flex gap-3">
 
           <button
   onClick={onWatch}

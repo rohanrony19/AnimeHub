@@ -1,20 +1,14 @@
-import { FaPlay } from "react-icons/fa";
-import { Link, useNavigate } from "react-router-dom";
-import { useEffect, useState, useRef } from "react";
+import { Link } from "react-router-dom";
+import { useEffect, useLayoutEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import toast from "react-hot-toast";
 import {
   getAnimeById,
-  getAnimeEpisodes,
   getAnimeRecommendations,
   getAnimeCharacters,
-  getAnimeRelations,
   getAnimeReviews,
 } from "../services/anime/jikanService";
-import {
-  getEpisodesByAnime,
-} from "../services/anime/databaseEpisodeService";
 import {
   addReview,
   getReviews,
@@ -23,12 +17,13 @@ import {
 import {
   addFavorite,
   removeFavorite,
-  getFavorites,
+  getFavoriteStatus,
 } from "../services/user/favoriteService";
+
 import {
   addWatchlist,
   removeWatchlist,
-  getWatchlist,
+  getWatchlistStatus,
 } from "../services/user/watchlistService";
 import {
   getDatabaseAnimeByMalId,
@@ -37,23 +32,17 @@ import {
 
 function JikanAnimeDetails() {
   const { id } = useParams();
-  const navigate = useNavigate();
+  useLayoutEffect(() => {
+    window.scrollTo(0, 0);
+  }, [id]);
 
   const [anime, setAnime] = useState(null);
-  const [databaseAnime, setDatabaseAnime] = useState(null);
-const videoRef = useRef(null);
-  const [episodes, setEpisodes] = useState([]);
-  const [isDatabaseEpisodes, setIsDatabaseEpisodes] = useState(false);
-  const [selectedEpisode, setSelectedEpisode] = useState(null);
-  const [episodePage, setEpisodePage] = useState(1);
+  const [animeError, setAnimeError] = useState(null);
   const [activeTab, setActiveTab] = useState("overview");
   const [recommendations, setRecommendations] = useState([]);
   const [characters, setCharacters] = useState([]);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [relations, setRelations] = useState([]);
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState("");
-  const [reviews, setReviews] = useState([]);
   const [userReviews, setUserReviews] = useState([]);
   const [jikanReviews, setJikanReviews] = useState([]);
   const [averageRating, setAverageRating] = useState(0);
@@ -62,119 +51,96 @@ const videoRef = useRef(null);
 
   useEffect(() => {
     const fetchAnime = async () => {
+      setAnimeError(null);
       let animeData;
+      let existingDbAnime = null;
 
-try {
-    const dbAnime = await getDatabaseAnimeByMalId(Number(id));
-    setDatabaseAnime(dbAnime);
-} catch (error) {
-    console.log("Anime not found in DB");
-}
+      try {
+        existingDbAnime = await getDatabaseAnimeByMalId(Number(id));
+      } catch (error) {
+        // Anime not found in DB
+      }
 
-try {
-    animeData = await getAnimeById(id);
-    setAnime(animeData);
-} catch (error) {
-    console.error("Anime Error:", error);
-    return;
-}
+      try {
+        for (let attempt = 1; attempt <= 3; attempt++) {
+          try {
+            animeData = await getAnimeById(id);
+            break;
+          } catch (error) {
+            if (error.response?.status === 404) {
+              setAnimeError("Anime Not Found");
+              return;
+            }
+
+            if (attempt === 3) {
+              setAnimeError("Unable to load anime details");
+              return;
+            }
+
+            await new Promise((resolve) => setTimeout(resolve, attempt * 1000));
+          }
+        }
+
+        setAnime(animeData);
+
+        if (existingDbAnime) {
+          try {
+            const [favoriteStatus, watchlistStatus] = await Promise.all([
+              getFavoriteStatus(existingDbAnime.id),
+              getWatchlistStatus(existingDbAnime.id),
+            ]);
+
+            setIsFavorite(favoriteStatus);
+            setIsWatchlist(watchlistStatus);
+          } catch (error) {
+            setIsFavorite(false);
+            setIsWatchlist(false);
+          }
+        } else {
+          setIsFavorite(false);
+          setIsWatchlist(false);
+        }
+      } catch (error) {
+        setAnimeError("Unable to load anime details");
+        return;
+      }
 
       try {
         const recommendationData = await getAnimeRecommendations(id);
         setRecommendations(recommendationData);
       } catch (error) {
-        console.log("Recommendations skipped");
+        // console.log("Recommendations skipped");
       }
 
       try {
         const characterData = await getAnimeCharacters(id);
         setCharacters(characterData);
       } catch (error) {
-        console.log("Characters skipped");
+        // console.log("Characters skipped");
       }
 
       try {
-  const jikanReviewData = await getAnimeReviews(id);
-  setJikanReviews(jikanReviewData);
-} catch (error) {
-  console.log("Jikan Reviews skipped");
-}
-
-try {
-  const dbAnime = await findOrCreateAnime({
-    malId: animeData.mal_id,
-    title: animeData.title,
-    description: animeData.synopsis,
-    genre: animeData.genres?.map((g) => g.name).join(", "),
-    releaseYear: animeData.year || 0,
-    rating: animeData.score || 0,
-    posterUrl: animeData.images?.jpg?.large_image_url,
-    status: animeData.status,
-    popular: false,
-    heroOrder: null,
-    bannerUrl: null,
-  });
-
-  const reviewData = await getReviews(dbAnime.id);
-  setUserReviews(reviewData);
-
-  const avg = await getAverageRating(dbAnime.id);
-  setAverageRating(avg);
-
-  const favorites = await getFavorites();
-
-  setIsFavorite(
-    favorites.some((fav) => fav.malId === animeData.mal_id)
-  );
-
-  const watchlist = await getWatchlist();
-
-  setIsWatchlist(
-    watchlist.some((item) => item.malId === animeData.mal_id)
-  );
-} catch (error) {
-  console.log("Database skipped");
-}
-
-      try {
-        const relationData = await getAnimeRelations(id);
-        setRelations(relationData);
+        const jikanReviewData = await getAnimeReviews(id);
+        setJikanReviews(jikanReviewData);
       } catch (error) {
-        console.log("Relations skipped");
+        // console.log("Jikan Reviews skipped");
+      }
+
+      if (existingDbAnime) {
+        try {
+          const reviewData = await getReviews(existingDbAnime.id);
+          setUserReviews(reviewData);
+
+          const avg = await getAverageRating(existingDbAnime.id);
+          setAverageRating(avg);
+        } catch (error) {
+          // Database reviews skipped
+        }
       }
     };
 
     fetchAnime();
   }, [id]);
-
-  useEffect(() => {
-  const fetchEpisodes = async () => {
-    try {
-      const dbAnime = await getDatabaseAnimeByMalId(Number(id));
-
-      const dbEpisodes = await getEpisodesByAnime(dbAnime.id);
-
-      if (dbEpisodes.length > 0) {
-        setEpisodes(dbEpisodes);
-        setIsDatabaseEpisodes(true);
-        return;
-      }
-    } catch (error) {
-     console.log("Anime not in DB:", error.response?.status);
-    }
-
-    try {
-      const jikanEpisodes = await getAnimeEpisodes(id, episodePage);
-
-      setEpisodes(jikanEpisodes);
-      setIsDatabaseEpisodes(false);
-    } catch (error) {
-      console.log(error);
-    }
-  };
-
-  fetchEpisodes();
-}, [id, episodePage]);
 
   const handleReview = async () => {
     try {
@@ -208,10 +174,38 @@ try {
 
       toast.success("Review submitted successfully ⭐");
     } catch (error) {
-      console.log(error);
       toast.error(error.response?.data?.message || "Failed to submit review.");
     }
   };
+
+  if (animeError) {
+    return (
+      <>
+        <Navbar />
+
+        <div className="min-h-[70vh] flex items-center justify-center px-6 pt-24">
+          <div className="bg-slate-900 rounded-3xl p-10 text-center max-w-xl">
+            <div className="text-6xl mb-4">🎬</div>
+
+            <h2 className="text-3xl font-bold">{animeError}</h2>
+
+            <p className="text-gray-400 mt-4">
+              {animeError === "Anime Not Found"
+                ? "We couldn't find this anime on Jikan."
+                : "The anime details are temporarily unavailable. Please try again later."}
+            </p>
+
+            <button
+              onClick={() => window.location.reload()}
+              className="mt-6 bg-orange-500 hover:bg-orange-600 px-6 py-3 rounded-xl font-semibold"
+            >
+              Try Again
+            </button>
+          </div>
+        </div>
+      </>
+    );
+  }
 
   if (!anime) {
     return (
@@ -243,102 +237,67 @@ try {
     );
   }
 
-const handleFavorite = async () => {
-  try {
-    if (isFavorite) {
-      await removeFavorite(anime.mal_id);
+  const handleFavorite = async () => {
+    try {
+      if (isFavorite) {
+        await removeFavorite(anime.mal_id);
 
-      setIsFavorite(false);
-      toast.success("Removed from Favorites ❤️");
-      return;
+        setIsFavorite(false);
+        toast.success("Removed from Favorites ❤️");
+        return;
+      }
+
+      await addFavorite({
+        malId: anime.mal_id,
+        title: anime.title,
+        description: anime.synopsis,
+        genre: anime.genres?.map((g) => g.name).join(", "),
+        releaseYear: anime.year || 0,
+        rating: anime.score || 0,
+        posterUrl: anime.images?.jpg?.large_image_url,
+        status: anime.status,
+        popular: false,
+        heroOrder: null,
+        bannerUrl: null,
+      });
+
+      setIsFavorite(true);
+      toast.success("Added to Favorites ❤️");
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Something went wrong.");
     }
+  };
 
-    await addFavorite({
-      malId: anime.mal_id,
-      title: anime.title,
-      description: anime.synopsis,
-      genre: anime.genres?.map((g) => g.name).join(", "),
-      releaseYear: anime.year || 0,
-      rating: anime.score || 0,
-      posterUrl: anime.images?.jpg?.large_image_url,
-      status: anime.status,
-      popular: false,
-      heroOrder: null,
-      bannerUrl: null,
-    });
+  const handleWatchlist = async () => {
+    try {
+      if (isWatchlist) {
+        await removeWatchlist(anime.mal_id);
 
-    setIsFavorite(true);
-    toast.success("Added to Favorites ❤️");
-  } catch (error) {
-    toast.error(
-      error.response?.data?.message || "Something went wrong."
-    );
-  }
-};
+        setIsWatchlist(false);
+        toast.success("Removed from Watchlist 📌");
+        return;
+      }
 
- const handleWatchlist = async () => {
-  try {
-    if (isWatchlist) {
-      await removeWatchlist(anime.mal_id);
+      await addWatchlist({
+        malId: anime.mal_id,
+        title: anime.title,
+        description: anime.synopsis,
+        genre: anime.genres?.map((g) => g.name).join(", "),
+        releaseYear: anime.year || 0,
+        rating: anime.score || 0,
+        posterUrl: anime.images?.jpg?.large_image_url,
+        status: anime.status,
+        popular: false,
+        heroOrder: null,
+        bannerUrl: null,
+      });
 
-      setIsWatchlist(false);
-      toast.success("Removed from Watchlist 📌");
-      return;
+      setIsWatchlist(true);
+      toast.success("Added to Watchlist 📌");
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Something went wrong.");
     }
-
-    await addWatchlist({
-      malId: anime.mal_id,
-      title: anime.title,
-      description: anime.synopsis,
-      genre: anime.genres?.map((g) => g.name).join(", "),
-      releaseYear: anime.year || 0,
-      rating: anime.score || 0,
-      posterUrl: anime.images?.jpg?.large_image_url,
-      status: anime.status,
-      popular: false,
-      heroOrder: null,
-      bannerUrl: null,
-    });
-
-    setIsWatchlist(true);
-    toast.success("Added to Watchlist 📌");
-  } catch (error) {
-    toast.error(
-      error.response?.data?.message || "Something went wrong."
-    );
-  }
-};
-
-const handleWatchEpisode = async (episodeNumber) => {
-  try {
-    const dbAnime = await getDatabaseAnimeByMalId(anime.mal_id);
-
-    const dbEpisodes = await getEpisodesByAnime(dbAnime.id);
-
-    // No uploaded episodes -> use Jikan
-    if (dbEpisodes.length === 0) {
-      navigate(`/watch/${anime.mal_id}/${episodeNumber}`);
-      return;
-    }
-
-    // Find the same episode number in DB
-    const matchedEpisode = dbEpisodes.find(
-      (ep) => ep.episodeNumber === episodeNumber
-    );
-
-    // Same episode found -> DB Watch Page
-    if (matchedEpisode) {
-      navigate(`/db/watch/${dbAnime.id}/${matchedEpisode.id}`);
-      return;
-    }
-
-    // Episode not uploaded yet -> Jikan
-    navigate(`/watch/${anime.mal_id}/${episodeNumber}`);
-  } catch (error) {
-    // Anime not in DB -> Jikan
-    navigate(`/watch/${anime.mal_id}/${episodeNumber}`);
-  }
-};
+  };
 
   return (
     <>
@@ -390,38 +349,27 @@ const handleWatchEpisode = async (episodeNumber) => {
           <div>
             <div className=" bg-slate-900 rounded-3xl p-6 shadow-2xl h-full">
               <div className="relative">
-                {databaseAnime?.trailerUrl ? (
-  <div className="relative">
-    <video
-      ref={videoRef}
-      controls
-      onPlay={() => setIsPlaying(true)}
-      onPause={() => setIsPlaying(false)}
-      className="w-[90%] mx-auto h-[550px] rounded-3xl bg-black object-cover"
-    >
-      <source src={databaseAnime.trailerUrl} type="video/mp4" />
-    </video>
+                {anime.trailer?.embed_url ? (
+                  <iframe
+                    src={anime.trailer.embed_url}
+                    className="w-[90%] mx-auto h-[550px] rounded-3xl bg-black object-cover"
+                    allowFullScreen
+                  />
+                ) : (
+                  <div className="w-[90%] h-[550px] mx-auto rounded-3xl bg-slate-800 flex items-center justify-center">
+                    <div className="text-center">
+                      <div className="text-6xl mb-4">🎬</div>
 
-    {!isPlaying && (
-      <div
-        onClick={() => videoRef.current?.play()}
-        className="absolute inset-0 flex items-center justify-center cursor-pointer"
-      >
-        <div className="w-20 h-20 rounded-full bg-white flex items-center justify-center">
-          <FaPlay className="text-black text-3xl ml-1" />
-        </div>
-      </div>
-    )}
-  </div>
-) : (
-  <iframe
-    src={anime.trailer?.embed_url}
-    className="w-[90%] mx-auto h-[550px] rounded-3xl bg-black object-cover"
-    allowFullScreen
-  />
-)}
+                      <h2 className="text-3xl font-bold">
+                        Trailer Coming Soon
+                      </h2>
 
-               
+                      <p className="text-gray-400 mt-4">
+                        Trailer is currently unavailable for this anime.
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -481,7 +429,7 @@ const handleWatchEpisode = async (episodeNumber) => {
             </div>
             {activeTab === "overview" && (
               <div className="mt-8 bg-slate-900 rounded-3xl p-6 shadow-2xl">
-                <h2 className="text-2xl font-bold mb-4">Synopsis</h2>
+                <h2 className="text-2xl font-bold mb-4">Description</h2>
 
                 <p className="text-gray-300 leading-8">{anime.synopsis}</p>
               </div>
@@ -492,24 +440,39 @@ const handleWatchEpisode = async (episodeNumber) => {
               <div className="mt-8 bg-slate-900 rounded-3xl p-6 shadow-2xl">
                 <h2 className="text-2xl font-bold mb-6">Characters</h2>
 
-                <div className="grid md:grid-cols-3 lg:grid-cols-4 gap-6">
-                  {characters.slice(0, 12).map((item) => (
-                    <div
-                      key={item.character.mal_id}
-                      className="bg-[#1b1b1b] rounded-2xl overflow-hidden"
-                    >
-                      <img
-                        src={item.character.images.jpg.image_url}
-                        alt={item.character.name}
-                        className="w-full h-72 object-cover"
-                      />
+                {characters.length === 0 ? (
+                  <div className="bg-[#1b1b1b] rounded-2xl p-10 text-center">
+                    <div className="text-6xl mb-4">👥</div>
 
-                      <div className="p-4">
-                        <h3 className="font-semibold">{item.character.name}</h3>
+                    <h3 className="text-2xl font-bold">No Characters Found</h3>
+
+                    <p className="text-gray-400 mt-3">
+                      Character information is currently unavailable for this
+                      anime.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="grid md:grid-cols-3 lg:grid-cols-4 gap-6">
+                    {characters.slice(0, 12).map((item) => (
+                      <div
+                        key={item.character.mal_id}
+                        className="bg-[#1b1b1b] rounded-2xl overflow-hidden"
+                      >
+                        <img
+                          src={item.character.images.jpg.image_url}
+                          alt={item.character.name}
+                          className="w-full h-72 object-cover"
+                        />
+
+                        <div className="p-4">
+                          <h3 className="font-semibold">
+                            {item.character.name}
+                          </h3>
+                        </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 
@@ -612,101 +575,61 @@ const handleWatchEpisode = async (episodeNumber) => {
               <div className="mt-8 bg-slate-900 rounded-3xl p-6 shadow-2xl">
                 <h2 className="text-2xl font-bold mb-6">Similar Anime</h2>
 
-                <div className="grid md:grid-cols-3 lg:grid-cols-4 gap-6">
-                  {recommendations.slice(0, 8).map((item) => (
-                    <Link
-                      key={item.entry.mal_id}
-                      to={`/jikan/${item.entry.mal_id}`}
-                    >
-                      <div className="bg-[#1b1b1b] rounded-2xl overflow-hidden hover:scale-105 transition">
-                        <img
-                          src={item.entry.images.jpg.large_image_url}
-                          alt={item.entry.title}
-                          className="w-full h-72 object-cover"
-                        />
+                {recommendations.length === 0 ? (
+                  <div className="bg-[#1b1b1b] rounded-2xl p-10 text-center">
+                    <div className="text-6xl mb-4">🎬</div>
 
-                        <div className="p-4">
-                          <h3 className="font-semibold">{item.entry.title}</h3>
+                    <h3 className="text-2xl font-bold">
+                      No Similar Anime Found
+                    </h3>
+
+                    <p className="text-gray-400 mt-3">
+                      Similar anime recommendations are currently unavailable.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="grid md:grid-cols-3 lg:grid-cols-4 gap-6">
+                    {recommendations.slice(0, 8).map((item) => (
+                      <Link
+                        key={item.entry.mal_id}
+                        to={`/jikan/${item.entry.mal_id}`}
+                      >
+                        <div className="bg-[#1b1b1b] rounded-2xl overflow-hidden hover:scale-105 transition">
+                          <img
+                            src={item.entry.images.jpg.large_image_url}
+                            alt={item.entry.title}
+                            className="w-full h-72 object-cover"
+                          />
+
+                          <div className="p-4">
+                            <h3 className="font-semibold">
+                              {item.entry.title}
+                            </h3>
+                          </div>
                         </div>
-                      </div>
-                    </Link>
-                  ))}
-                </div>
+                      </Link>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 
             {/* Episode List */}
             {activeTab === "episodes" && (
-              <div className="mt-8 bg-slate-900 rounded-3xl p-6 shadow-2xl">
-                <div className="flex items-center justify-between mb-6">
-                  <button className="bg-[#1b1b1b] px-5 py-3 rounded-xl font-semibold hover:bg-[#2a2a2a] transition">
-                    Season 1 ▼
-                  </button>
+  <div className="mt-8 bg-slate-900 rounded-3xl p-6 shadow-2xl">
+    <h2 className="text-2xl font-bold mb-6">Episodes</h2>
 
-                  <span className="text-gray-400">
-                    {anime?.episodes} Episodes
-                  </span>
-                </div>
-                        {episodes.map((episode) => (
-                          <div
-          key={isDatabaseEpisodes ? episode.id : episode.mal_id}
-          onClick={() =>
-  handleWatchEpisode(
-    isDatabaseEpisodes
-      ? episode.episodeNumber
-      : episode.mal_id
-  )
-}
-          className="cursor-pointer"
-        >
-                    <div className="flex items-center gap-5 p-4 rounded-2xl cursor-pointer transition border border-transparent bg-[#1b1b1b] hover:bg-[#2a2a2a]">
-                      {/* Episode Number */}
-                      <div className="w-14 h-14 flex items-center justify-center rounded-xl bg-black text-xl font-bold">
-                        {String(
-  isDatabaseEpisodes
-    ? episode.episodeNumber
-    : episode.mal_id
-).padStart(2, "0")}
-                      </div>
+    <div className="bg-[#1b1b1b] rounded-2xl p-10 text-center">
+      <div className="text-6xl mb-4">🎬</div>
 
-                      {/* Episode Info */}
-                      <div>
-                        <h3 className="font-semibold text-lg">
-                          EP {String(
-  isDatabaseEpisodes
-    ? episode.episodeNumber
-    : episode.mal_id
-).padStart(2, "0")}
-                        </h3>
+      <h3 className="text-2xl font-bold">Episodes Coming Soon</h3>
 
-                        <p className="text-gray-400 text-sm">{episode.title}</p>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-
-                <div className="flex justify-center gap-4 mt-8">
-                  <button
-                    disabled={episodePage === 1}
-                    onClick={() => setEpisodePage((prev) => prev - 1)}
-                    className="bg-orange-500 px-5 py-2 rounded-xl disabled:opacity-50"
-                  >
-                    Previous
-                  </button>
-
-                  <span className="flex items-center text-gray-400">
-                    Page {episodePage}
-                  </span>
-
-                  <button
-                    onClick={() => setEpisodePage((prev) => prev + 1)}
-                    className="bg-orange-500 px-5 py-2 rounded-xl"
-                  >
-                    Next
-                  </button>
-                </div>
-              </div>
-            )}
+      <p className="text-gray-400 mt-3">
+        No episodes have been uploaded for this anime yet.
+      </p>
+    </div>
+  </div>
+)}
           </div>
         </div>
       </div>

@@ -10,7 +10,22 @@ export const addFavorite = async (anime) => {
     return response.data;
 };
 
+export const addFavoriteByAnimeId = async (animeId) => {
+    const response = await api.post(`/favorites/anime/${animeId}`);
+    return response.data;
+};
+
 export const removeFavorite = async (animeId) => {
     const response = await api.delete(`/favorites/${animeId}`);
+    return response.data;
+};
+
+export const removeFavoriteByAnimeId = async (animeId) => {
+    const response = await api.delete(`/favorites/anime/${animeId}`);
+    return response.data;
+};
+
+export const getFavoriteStatus = async (animeId) => {
+    const response = await api.get(`/favorites/${animeId}`);
     return response.data;
 };

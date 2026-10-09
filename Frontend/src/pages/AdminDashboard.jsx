@@ -11,7 +11,7 @@ import {
   deleteAnime,
   updateAnime,
 } from "../services/admin/animeAdminService";
-import { getAnimeByTitle } from "../services/anime/jikanService";
+import { searchAnimeList } from "../services/anime/jikanService";
 import { searchDatabaseAnime } from "../services/anime/searchService";
 import {
   addEpisode,
@@ -36,7 +36,6 @@ import {
   uploadImage,
   uploadTrailer,
 } from "../services/upload/uploadService";
-import { searchAnimeList } from "../services/anime/jikanService";
 import genres from "../data/genres"; // change the path if needed
 
 function AdminDashboard() {
@@ -94,6 +93,7 @@ function AdminDashboard() {
   const [searchLoading, setSearchLoading] = useState(false);
   const [malId, setMalId] = useState(null);
   const [expandedAnime, setExpandedAnime] = useState(null);
+  const [expandedSeason, setExpandedSeason] = useState(null);
   const [trailerFile, setTrailerFile] = useState(null);
   const [trailerUrl, setTrailerUrl] = useState("");
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -161,11 +161,14 @@ function AdminDashboard() {
         );
       }
       let uploadedTrailerUrl = trailerUrl;
+      let uploadedTrailerThumbnailUrl = "";
 
       if (trailerFile) {
-        uploadedTrailerUrl = await uploadTrailer(trailerFile, title);
-      }
+        const trailerResponse = await uploadTrailer(trailerFile, title);
 
+        uploadedTrailerUrl = trailerResponse.url;
+        uploadedTrailerThumbnailUrl = trailerResponse.thumbnailUrl;
+      }
       const animeRequest = {
         malId,
         title,
@@ -175,6 +178,7 @@ function AdminDashboard() {
         rating,
         posterUrl: uploadedPosterUrl,
         trailerUrl: uploadedTrailerUrl,
+        trailerThumbnailUrl: uploadedTrailerThumbnailUrl,
         status,
       };
 
@@ -284,25 +288,31 @@ function AdminDashboard() {
     try {
       setEpisodeLoading(true);
       let uploadedVideoUrl = "";
+      let uploadedThumbnailUrl = "";
 
       if (videoFile) {
         const selectedAnime = animeList.find(
           (anime) => anime.id === Number(animeId),
         );
 
-        uploadedVideoUrl = await uploadVideo(
+        const videoResponse = await uploadVideo(
           videoFile,
           selectedAnime.title,
           Number(seasonNumber),
           Number(episodeNumber),
         );
+
+        uploadedVideoUrl = videoResponse.url;
+        uploadedThumbnailUrl = videoResponse.thumbnailUrl;
       }
 
       const request = {
+        animeId: Number(animeId),
         seasonNumber: Number(seasonNumber),
         episodeNumber: Number(episodeNumber),
         title: episodeTitle,
         videoUrl: uploadedVideoUrl || currentVideoUrl,
+        thumbnailUrl: uploadedThumbnailUrl || null,
         duration: Number(duration),
       };
 
@@ -482,7 +492,7 @@ function AdminDashboard() {
 
       return acc;
     }, {}),
-  );
+  ).sort((a, b) => a.animeTitle.localeCompare(b.animeTitle));
 
   const genreOptions = genres.map((genre) => ({
     value: genre.name,
@@ -615,7 +625,10 @@ function AdminDashboard() {
               </button>
 
               <button
-                onClick={() => setSelectedMenu("episodes")}
+                onClick={() => {
+                  setEditingEpisodeId(null);
+                  setSelectedMenu("episodes");
+                }}
                 className={`w-full text-left rounded-2xl px-4 md:px-5 py-3 md:py-4 text-sm md:text-base transition ${
                   selectedMenu === "episodes"
                     ? "bg-violet-600 text-white"
@@ -717,7 +730,10 @@ function AdminDashboard() {
                     </button>
 
                     <button
-                      onClick={() => setSelectedMenu("episodes")}
+                      onClick={() => {
+                        setEditingEpisodeId(null);
+                        setSelectedMenu("episodes");
+                      }}
                       className="bg-violet-600 hover:bg-violet-700 rounded-2xl py-5 font-semibold transition"
                     >
                       ➕ Add Episode
@@ -797,7 +813,7 @@ function AdminDashboard() {
                           disabled={searchLoading}
                           className="w-full sm:w-auto bg-violet-600 hover:bg-violet-700 disabled:bg-violet-400 disabled:cursor-not-allowed rounded-2xl px-6 py-4 font-semibold transition"
                         >
-                          {searchLoading ? "Searching..." : "Search Jikan"}
+                          {searchLoading ? "Searching..." : "Search Anime"}
                         </button>
                       </div>
                     </div>
@@ -933,34 +949,43 @@ function AdminDashboard() {
                         onChange={(e) => setPosterFile(e.target.files[0])}
                       />
 
-                      <div className="w-full flex flex-col sm:flex-row sm:items-center bg-slate-800 border border-slate-700 rounded-2xl overflow-hidden">
-                        <label
-                          htmlFor="posterImage"
-                          className="bg-violet-600 hover:bg-violet-700 px-6 py-4 cursor-pointer font-semibold text-center whitespace-nowrap"
-                        >
-                          Choose Image
-                        </label>
-
-                        <div className="flex-1 px-4 py-3 text-gray-300 truncate min-w-0">
-                          {posterFile
-                            ? posterFile.name
-                            : editingAnimeId && posterUrl
-                              ? "Current image uploaded (choose new image to replace)"
-                              : "No image chosen"}
-                        </div>
-
-                        {posterFile && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setPosterFile(null);
-                              document.getElementById("posterImage").value = "";
-                            }}
-                            className="px-4 text-xl text-gray-400 hover:text-red-500"
+                      <div className="w-full">
+                        <div className="flex flex-col sm:flex-row sm:items-center bg-slate-800 border border-slate-700 rounded-2xl overflow-hidden">
+                          <label
+                            htmlFor="posterImage"
+                            className="bg-violet-600 hover:bg-violet-700 px-6 py-4 cursor-pointer font-semibold text-center whitespace-nowrap"
                           >
-                            ✕
-                          </button>
-                        )}
+                            Choose Image
+                          </label>
+
+                          <div className="flex-1 px-4 py-3 text-gray-300 truncate min-w-0">
+                            {posterFile
+                              ? posterFile.name
+                              : editingAnimeId && posterUrl
+                                ? "Current image uploaded"
+                                : posterUrl
+                                  ? "Poster image loaded"
+                                  : "No image chosen"}
+                          </div>
+
+                          {(posterFile || posterUrl) && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setPosterFile(null);
+                                setPosterUrl("");
+
+                                const input =
+                                  document.getElementById("posterImage");
+                                if (input) input.value = "";
+                              }}
+                              className="flex items-center justify-center w-12 h-12 text-gray-400 hover:text-red-500 hover:bg-slate-700 transition-colors text-xl"
+                              title="Remove image"
+                            >
+                              ✕
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </div>
                     <div className="grid grid-cols-1 lg:grid-cols-[170px_1fr] items-start lg:items-center gap-3 lg:gap-4">
@@ -992,15 +1017,19 @@ function AdminDashboard() {
                               : "No trailer selected"}
                         </div>
 
-                        {trailerFile && (
+                        {(trailerFile || (editingAnimeId && trailerUrl)) && (
                           <button
                             type="button"
                             onClick={() => {
                               setTrailerFile(null);
-                              document.getElementById("trailerVideo").value =
-                                "";
+                              setTrailerUrl("");
+
+                              const input =
+                                document.getElementById("trailerVideo");
+                              if (input) input.value = "";
                             }}
-                            className="px-4 text-xl text-gray-400 hover:text-red-500"
+                            className="flex items-center justify-center w-12 h-12 text-gray-400 hover:text-red-500 hover:bg-slate-700 transition-colors text-xl"
+                            title="Remove trailer"
                           >
                             ✕
                           </button>
@@ -1260,7 +1289,6 @@ function AdminDashboard() {
                         }
                         onChange={(selected) => {
                           setAnimeId(selected ? selected.value : "");
-                          setSeasonNumber(1);
                         }}
                         placeholder="Search Anime..."
                         isSearchable
@@ -1538,7 +1566,7 @@ function AdminDashboard() {
                               <img
                                 src={animeInfo?.posterUrl}
                                 alt={episode.animeTitle}
-                                className="w-28 h-40 sm:w-24 sm:h-32 lg:w-20 lg:h-28 rounded-2xl object-cover shadow-lg"
+                                className="w-28 h-40 sm:w-24 sm:h-32 lg:w-20 lg:h-28 rounded-2xl object-cover shadow-lg self-center"
                               />
 
                               <div>
@@ -1590,82 +1618,136 @@ function AdminDashboard() {
                             </div>
                           </div>
                           {expandedAnime === episode.animeTitle && (
-                            <div className="mt-4 rounded-b-3xl bg-slate-900 px-4 sm:px-6 py-4">
-                              {episode.allEpisodes
-                                .sort((a, b) => {
-                                  if (a.seasonNumber !== b.seasonNumber) {
-                                    return b.seasonNumber - a.seasonNumber;
-                                  }
+                            <div className="mt-4 rounded-b-3xl bg-slate-900 px-4 sm:px-6 py-4 space-y-3">
+                              {[
+                                ...new Set(
+                                  episode.allEpisodes.map(
+                                    (ep) => ep.seasonNumber,
+                                  ),
+                                ),
+                              ]
+                                .sort((a, b) => a - b)
+                                .map((season) => {
+                                  const seasonEpisodes = episode.allEpisodes
+                                    .filter((ep) => ep.seasonNumber === season)
+                                    .sort(
+                                      (a, b) =>
+                                        a.episodeNumber - b.episodeNumber,
+                                    );
 
-                                  return b.episodeNumber - a.episodeNumber;
-                                })
-                                .map((ep) => (
-                                  <div
-                                    key={ep.id}
-                                    className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-slate-700 py-5 last:border-b-0"
-                                  >
-                                    <div className="flex flex-col flex-1">
-                                      <span className="text-violet-400 font-semibold text-sm text-center md:text-left">
-                                        S{ep.seasonNumber} • Episode{" "}
-                                        {ep.episodeNumber}
-                                      </span>
+                                  const seasonKey = `${episode.animeTitle}-${season}`;
 
-                                      <span className="text-white font-medium mt-2 text-center md:text-left">
-                                        {ep.title}
-                                      </span>
-
-                                      <span className="text-gray-500 text-sm mt-2 text-center md:text-left">
-                                        {Math.floor(ep.duration / 60)}m{" "}
-                                        {ep.duration % 60}s
-                                      </span>
-                                    </div>
-
-                                    <div className="flex justify-center md:justify-end gap-3 w-full md:w-auto">
+                                  return (
+                                    <div
+                                      key={season}
+                                      className="bg-slate-800 rounded-2xl overflow-hidden border border-slate-700"
+                                    >
+                                      {/* Season */}
                                       <button
-                                        onClick={() => {
-                                          setEditingEpisodeId(ep.id);
-
-                                          const anime = animeList.find(
-                                            (a) => a.title === ep.animeTitle,
-                                          );
-
-                                          if (anime) {
-                                            setAnimeId(anime.id);
-                                          }
-
-                                          setSeasonNumber(ep.seasonNumber);
-                                          setEpisodeNumber(ep.episodeNumber);
-                                          setEpisodeTitle(ep.title);
-                                          setDuration(ep.duration);
-                                          setCurrentVideoUrl(ep.videoUrl);
-
-                                          episodeFormRef.current?.scrollIntoView(
-                                            {
-                                              behavior: "smooth",
-                                              block: "start",
-                                            },
-                                          );
-                                        }}
-                                        className="w-12 h-12 rounded-full hover:bg-blue-600/20 text-blue-500 flex items-center justify-center transition"
-                                        title="Edit Episode"
+                                        type="button"
+                                        onClick={() =>
+                                          setExpandedSeason(
+                                            expandedSeason === seasonKey
+                                              ? null
+                                              : seasonKey,
+                                          )
+                                        }
+                                        className="w-full flex items-center justify-between px-5 py-4 hover:bg-slate-700 transition"
                                       >
-                                        <Pencil size={18} />
+                                        <span className="text-violet-400 font-semibold">
+                                          Season {season}
+                                        </span>
+
+                                        {expandedSeason === seasonKey ? (
+                                          <ChevronUp size={20} />
+                                        ) : (
+                                          <ChevronDown size={20} />
+                                        )}
                                       </button>
 
-                                      <button
-                                        onClick={() => {
-                                          setDeleteType("episode");
-                                          setDeleteItem(ep);
-                                          setShowDeleteModal(true);
-                                        }}
-                                        className="w-12 h-12 rounded-full hover:bg-red-600/20 text-red-500 flex items-center justify-center transition"
-                                        title="Delete Episode"
-                                      >
-                                        <Trash2 size={18} />
-                                      </button>
+                                      {/* Episodes */}
+                                      {expandedSeason === seasonKey && (
+                                        <div className="bg-slate-900 px-4">
+                                          {seasonEpisodes.map((ep) => (
+                                            <div
+                                              key={ep.id}
+                                              className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-slate-700 py-5 last:border-b-0"
+                                            >
+                                              <div className="flex flex-col flex-1">
+                                                <span className="text-violet-400 font-semibold text-sm">
+                                                  Episode {ep.episodeNumber}
+                                                </span>
+
+                                                <span className="text-white font-medium mt-2">
+                                                  {ep.title}
+                                                </span>
+
+                                                <span className="text-gray-500 text-sm mt-2">
+                                                  {Math.floor(ep.duration / 60)}
+                                                  m {ep.duration % 60}s
+                                                </span>
+                                              </div>
+
+                                              <div className="flex justify-center md:justify-end gap-3">
+                                                <button
+                                                  onClick={() => {
+                                                    setEditingEpisodeId(ep.id);
+
+                                                    const anime =
+                                                      animeList.find(
+                                                        (a) =>
+                                                          a.title ===
+                                                          ep.animeTitle,
+                                                      );
+
+                                                    if (anime) {
+                                                      setAnimeId(anime.id);
+                                                    }
+
+                                                    setSeasonNumber(
+                                                      ep.seasonNumber,
+                                                    );
+                                                    setEpisodeNumber(
+                                                      ep.episodeNumber,
+                                                    );
+                                                    setEpisodeTitle(ep.title);
+                                                    setDuration(ep.duration);
+                                                    setCurrentVideoUrl(
+                                                      ep.videoUrl,
+                                                    );
+
+                                                    episodeFormRef.current?.scrollIntoView(
+                                                      {
+                                                        behavior: "smooth",
+                                                        block: "start",
+                                                      },
+                                                    );
+                                                  }}
+                                                  className="w-12 h-12 rounded-full hover:bg-blue-600/20 text-blue-500 flex items-center justify-center transition"
+                                                  title="Edit Episode"
+                                                >
+                                                  <Pencil size={18} />
+                                                </button>
+
+                                                <button
+                                                  onClick={() => {
+                                                    setDeleteType("episode");
+                                                    setDeleteItem(ep);
+                                                    setShowDeleteModal(true);
+                                                  }}
+                                                  className="w-12 h-12 rounded-full hover:bg-red-600/20 text-red-500 flex items-center justify-center transition"
+                                                  title="Delete Episode"
+                                                >
+                                                  <Trash2 size={18} />
+                                                </button>
+                                              </div>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      )}
                                     </div>
-                                  </div>
-                                ))}
+                                  );
+                                })}
                             </div>
                           )}
                         </div>
@@ -1698,61 +1780,110 @@ function AdminDashboard() {
 
                   <div className="space-y-3">
                     {searchResults.length > 0 ? (
-                      searchResults.map((anime) => (
+                      searchResults.map((anime, index) => (
                         <div
-                          key={anime.mal_id || anime.id}
-                          onClick={() => {
+                          key={
+                            anime.mal_id ??
+                            anime.id ??
+                            `${anime.title}-${anime.year ?? anime.releaseYear ?? index}`
+                          }
+                          onClick={async () => {
+                            // Existing database anime
                             if (anime.id) {
                               setEditingAnimeId(anime.id);
-                            } else {
-                              setEditingAnimeId(null);
+
+                              setMalId(anime.malId ?? null);
+
+                              setTitle(anime.title || "");
+
+                              setDescription(anime.description || "");
+
+                              setGenre(
+                                (anime.genre || "")
+                                  .split(",")
+                                  .map((g) => g.trim())
+                                  .filter(Boolean)
+                                  .map((g) => ({
+                                    value: g,
+                                    label: g,
+                                  })),
+                              );
+
+                              setReleaseYear(anime.releaseYear || "");
+
+                              setRating(anime.rating || "");
+
+                              setPosterUrl(anime.posterUrl || "");
+
+                              setTrailerUrl(anime.trailerUrl || "");
+
+                              setStatus(anime.status || "");
+
+                              setPosterFile(null);
+
+                              setShowSearchModal(false);
+
+                              toast.success("Anime loaded for editing.");
+
+                              return;
                             }
 
-                            setMalId(anime.mal_id ?? anime.malId ?? null);
+                            // External metadata result
+                            setEditingAnimeId(null);
+
+                            setMalId(anime.mal_id ?? null);
+
                             setTitle(anime.title || "");
-                            setDescription(
-                              anime.synopsis || anime.description || "",
-                            );
+
+                            setDescription(anime.synopsis || "");
+
                             setGenre(
                               anime.genres
-                                ? anime.genres.map((g) => g.name).join(", ")
-                                : anime.genre || "",
+                                ? anime.genres.map((g) => ({
+                                    value: g.name,
+                                    label: g.name,
+                                  }))
+                                : [],
                             );
-                            setReleaseYear(
-                              anime.year || anime.releaseYear || "",
-                            );
-                            setRating(anime.score || anime.rating || "");
+
+                            setReleaseYear(anime.year || "");
+
+                            setRating(anime.score || "");
+
                             setPosterUrl(
-                              anime.images?.jpg?.large_image_url ||
-                                anime.posterUrl ||
-                                "",
+                              anime.images?.jpg?.large_image_url || "",
                             );
-                            setTrailerUrl(
-                              anime.trailer?.url || anime.trailerUrl || "",
-                            );
+
+                            setTrailerUrl("");
+
                             setStatus(
-                              anime.status === "Currently Airing"
+                              anime.status === "RELEASING"
                                 ? "ONGOING"
-                                : anime.status === "Finished Airing"
+                                : anime.status === "FINISHED"
                                   ? "COMPLETED"
-                                  : anime.status || "",
+                                  : anime.status === "NOT_YET_RELEASED"
+                                    ? "UPCOMING"
+                                    : "",
                             );
 
                             setPosterFile(null);
+
                             setShowSearchModal(false);
 
-                            toast.success(
-                              anime.id
-                                ? "Anime loaded for editing."
-                                : "Anime imported successfully!",
-                            );
+                            animeFormRef.current?.scrollIntoView({
+                              behavior: "smooth",
+                              block: "start",
+                            });
+
+                            toast.success("Anime metadata loaded.");
                           }}
                           className="flex flex-col sm:flex-row items-center sm:items-center gap-4 p-4 rounded-2xl bg-slate-800 hover:bg-violet-600 transition-all duration-300 cursor-pointer"
                         >
                           <img
                             src={
                               anime.images?.jpg?.large_image_url ||
-                              anime.posterUrl
+                              anime.posterUrl ||
+                              ""
                             }
                             alt={anime.title}
                             className="w-24 h-32 sm:w-14 sm:h-20 rounded-xl object-cover flex-shrink-0 shadow-lg"
@@ -1764,14 +1895,12 @@ function AdminDashboard() {
                             </h3>
 
                             <p className="text-sm text-gray-400 line-clamp-2 sm:truncate">
-                              ⭐ {anime.score || anime.rating || "N/A"} •{" "}
-                              {anime.year || anime.releaseYear || "-"}
+                              ⭐ {anime.score ?? anime.rating ?? "N/A"} •{" "}
+                              {anime.year ?? anime.releaseYear ?? "-"}
                             </p>
 
                             <p className="text-xs text-violet-300 line-clamp-2 sm:truncate">
-                              {anime.genres
-                                ? anime.genres.map((g) => g.name).join(", ")
-                                : anime.genre}
+                              {anime.genre || ""}
                             </p>
                           </div>
                         </div>

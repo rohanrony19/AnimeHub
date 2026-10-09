@@ -44,7 +44,11 @@ function HeroBanner() {
   };
 
   if (animeList.length === 0) {
-    return <SkeletonHero />;
+    return (
+      <div className="h-screen overflow-hidden">
+        <SkeletonHero />
+      </div>
+    );
   }
 
   const handleWatchNow = async () => {
@@ -101,6 +105,8 @@ function HeroBanner() {
       <img
         src={anime.bannerUrl}
         alt={anime.title}
+        width="1920"
+        height="1080"
         className="absolute inset-0 w-full h-full object-cover object-center"
       />
 

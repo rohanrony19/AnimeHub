@@ -7,8 +7,16 @@ import {
   markAsRead,
   deleteNotification,
 } from "../services/admin/notificationService";
-import { getFavorites, removeFavorite } from "../services/user/favoriteService";
-import { getWatchlist, removeWatchlist } from "../services/user/watchlistService";
+import {
+  getFavorites,
+  removeFavorite,
+  removeFavoriteByAnimeId,
+} from "../services/user/favoriteService";
+import {
+  getWatchlist,
+  removeWatchlist,
+  removeWatchlistByAnimeId,
+} from "../services/user/watchlistService";
 import {
   getContinueWatching,
   removeContinueWatching,
@@ -95,8 +103,8 @@ function Profile() {
   });
 
   useEffect(() => {
-  window.scrollTo(0, 0);
-}, []);
+    window.scrollTo(0, 0);
+  }, []);
 
   useEffect(() => {
     document.documentElement.className = theme;
@@ -121,52 +129,52 @@ function Profile() {
   }, [activeTab]);
 
   const handleWatch = async (anime) => {
-  try {
-    // Try using MAL ID first
-    if (anime.malId) {
-      const dbAnime = await getDatabaseAnimeByMalId(anime.malId);
-      const dbEpisodes = await getEpisodesByAnime(dbAnime.id);
+    try {
+      // Try using MAL ID first
+      if (anime.malId) {
+        const dbAnime = await getDatabaseAnimeByMalId(anime.malId);
+        const dbEpisodes = await getEpisodesByAnime(dbAnime.id);
 
-      if (dbEpisodes.length > 0) {
-        navigate(`/db/watch/${dbAnime.id}/${dbEpisodes[0].id}`);
-      } else {
+        if (dbEpisodes.length > 0) {
+          navigate(`/db/watch/${dbAnime.id}/${dbEpisodes[0].id}`);
+        } else {
+          navigate(`/watch/${anime.malId}/1`);
+        }
+
+        return;
+      }
+
+      // Fallback for DB-only anime
+      if (anime.id || anime.animeId) {
+        const dbId = anime.id || anime.animeId;
+        const dbEpisodes = await getEpisodesByAnime(dbId);
+
+        if (dbEpisodes.length > 0) {
+          navigate(`/db/watch/${dbId}/${dbEpisodes[0].id}`);
+        } else {
+          navigate(`/anime/${dbId}`);
+        }
+
+        return;
+      }
+    } catch (error) {
+      if (anime.malId) {
         navigate(`/watch/${anime.malId}/1`);
-      }
-
-      return;
-    }
-
-    // Fallback for DB-only anime
-    if (anime.id || anime.animeId) {
-      const dbId = anime.id || anime.animeId;
-      const dbEpisodes = await getEpisodesByAnime(dbId);
-
-      if (dbEpisodes.length > 0) {
-        navigate(`/db/watch/${dbId}/${dbEpisodes[0].id}`);
       } else {
-        navigate(`/anime/${dbId}`);
+        navigate(`/anime/${anime.id || anime.animeId}`);
       }
-
-      return;
     }
-  } catch (error) {
-    if (anime.malId) {
-      navigate(`/watch/${anime.malId}/1`);
-    } else {
-      navigate(`/anime/${anime.id || anime.animeId}`);
-    }
-  }
-};
+  };
 
   const handleLogout = () => {
-  setShowLogoutModal(false);
+    setShowLogoutModal(false);
 
-  localStorage.removeItem("token");
-  localStorage.removeItem("role");
-  localStorage.removeItem("theme");
+    localStorage.removeItem("token");
+    localStorage.removeItem("role");
+    localStorage.removeItem("theme");
 
-  navigate("/login");
-};
+    navigate("/login");
+  };
 
   useEffect(() => {
     const fetchProfileData = async () => {
@@ -184,18 +192,15 @@ function Profile() {
         setProfileImage(userData.profileImage);
 
         const favoriteData = await getFavorites();
-        console.log("Favorites API:", favoriteData);
 
         setFavorites(favoriteData);
 
         const watchlistData = await getWatchlist();
-        console.log("Watchlist API:", watchlistData);
         setWatchlist(watchlistData);
         const continueData = await getContinueWatching();
-        console.log("Continue API:", continueData);
         setContinueWatching(continueData);
       } catch (error) {
-        console.log(error);
+        toast.error("Failed to load profile data.");
       }
     };
 
@@ -208,20 +213,15 @@ function Profile() {
     try {
       const data = await getMyNotifications();
 
-      console.log("Notifications:", data); // <-- ADD THIS
-      console.log("Notifications:", JSON.stringify(data));
-      console.log("Length:", data?.length);
-
       setNotifications(
         [...data].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)),
       );
     } catch (error) {
-      console.log("Notification Error:", error); // <-- REPLACE THIS
+      toast.error("Failed to load notifications.");
     }
   };
 
   useEffect(() => {
-    console.log("Fetching notifications...");
     fetchNotifications();
   }, []);
 
@@ -305,7 +305,6 @@ function Profile() {
 
                         toast.success("Profile updated successfully!");
                       } catch (error) {
-                        console.log(error);
                         toast.error("Upload failed");
                       }
                     }}
@@ -539,7 +538,6 @@ function Profile() {
 
                           toast.success("Profile updated successfully!");
                         } catch (error) {
-                          console.error(error);
                           toast.error("Failed to update profile");
                         } finally {
                           setSaving(false);
@@ -927,21 +925,25 @@ ${
                             key={anime.animeId}
                             image={anime.posterUrl}
                             title={anime.title}
-                            subtitle={`⭐ ${anime.score || "N/A"}`}
+                            subtitle={`⭐ ${anime.rating || "N/A"}`}
                             extra={
                               anime.genres?.map((g) => g.name).join(" • ") ||
                               anime.genre
                             }
                             watchLink="#"
-onWatch={() => handleWatch(anime)}
+                            onWatch={() => handleWatch(anime)}
                             watchText="Watch"
                             removeText="Remove"
                             onRemove={async () => {
-                              await removeFavorite(anime.malId);
+                              if (anime.malId) {
+                                await removeFavorite(anime.malId);
+                              } else {
+                                await removeFavoriteByAnimeId(anime.animeId);
+                              }
 
                               setFavorites(
                                 favorites.filter(
-                                  (item) => item.malId !== anime.malId,
+                                  (item) => item.animeId !== anime.animeId,
                                 ),
                               );
                             }}
@@ -959,21 +961,25 @@ onWatch={() => handleWatch(anime)}
                             key={anime.animeId}
                             image={anime.posterUrl}
                             title={anime.title}
-                            subtitle={`⭐ ${anime.score || "N/A"}`}
+                            subtitle={`⭐ ${anime.rating || "N/A"}`}
                             extra={
                               anime.genres?.map((g) => g.name).join(" • ") ||
                               anime.genre
                             }
                             watchLink="#"
-onWatch={() => handleWatch(anime)}
+                            onWatch={() => handleWatch(anime)}
                             watchText="Watch"
                             removeText="Remove"
                             onRemove={async () => {
-                              await removeWatchlist(anime.malId);
+                              if (anime.malId) {
+                                await removeWatchlist(anime.malId);
+                              } else {
+                                await removeWatchlistByAnimeId(anime.animeId);
+                              }
 
                               setWatchlist(
                                 watchlist.filter(
-                                  (item) => item.malId !== anime.malId,
+                                  (item) => item.animeId !== anime.animeId,
                                 ),
                               );
                             }}
@@ -994,7 +1000,14 @@ onWatch={() => handleWatch(anime)}
                             key={`${item.episodeId}-${item.episodeTitle}`}
                             image={item.posterUrl}
                             title={item.animeTitle}
-                            subtitle="▶ Continue Watching"
+                            subtitle={`S${item.seasonNumber}:E${item.episodeNumber} • ${Math.max(
+                              0,
+                              Math.ceil(
+                                ((item.duration || 0) -
+                                  (item.watchedTimeInSeconds || 0)) /
+                                  60,
+                              ),
+                            )}m left`}
                             extra={item.episodeTitle}
                             progress={Math.min(
                               ((item.watchedTimeInSeconds || 0) /
@@ -1002,20 +1015,17 @@ onWatch={() => handleWatch(anime)}
                                 100,
                               100,
                             )}
-                            watchedText={`${Math.floor(
-                              (item.watchedTimeInSeconds || 0) / 60,
-                            )}m watched • ${Math.floor(
-                              (item.duration || 0) / 60,
-                            )}m total`}
                             watchLink="#"
-onWatch={() =>
-  navigate(`/db/watch/${item.animeId}/${item.episodeId}`)
-}
-watchText="Resume"
+                            onWatch={() =>
+                              navigate(
+                                `/db/watch/${item.animeId}/${item.episodeId}`,
+                              )
+                            }
+                            watchText="Resume"
                             removeText="Remove"
                             onRemove={async () => {
                               try {
-                                await removeContinueWatching(item.episodeId);
+                                await removeContinueWatching(item.animeId);
 
                                 setContinueWatching(
                                   continueWatching.filter(
@@ -1026,7 +1036,6 @@ watchText="Resume"
 
                                 toast.success("Removed from Continue Watching");
                               } catch (error) {
-                                console.error(error);
                                 toast.error("Failed to remove");
                               }
                             }}
@@ -1275,8 +1284,6 @@ watchText="Resume"
                               setNewPasswordError("");
                               setConfirmPasswordError("");
                             } catch (error) {
-                              console.error(error);
-
                               const message =
                                 error.response?.data?.message ??
                                 "Failed to change password";
@@ -1328,40 +1335,32 @@ watchText="Resume"
         </div>
       </div>
       {showLogoutModal && (
-  <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="w-[400px] rounded-3xl bg-[#151C2F] border border-violet-700 shadow-[0_0_35px_rgba(139,92,246,0.25)] p-8">
+            <h2 className="text-2xl font-bold text-white mb-3">Logout</h2>
 
-    <div className="w-[400px] rounded-3xl bg-[#151C2F] border border-violet-700 shadow-[0_0_35px_rgba(139,92,246,0.25)] p-8">
+            <p className="text-gray-400 leading-7">
+              Are you sure you want to logout from your account?
+            </p>
 
-      <h2 className="text-2xl font-bold text-white mb-3">
-        Logout
-      </h2>
+            <div className="flex justify-end gap-4 mt-8">
+              <button
+                onClick={() => setShowLogoutModal(false)}
+                className="px-6 py-3 rounded-xl border border-slate-700 text-gray-300 hover:bg-slate-800 transition"
+              >
+                Cancel
+              </button>
 
-      <p className="text-gray-400 leading-7">
-        Are you sure you want to logout from your account?
-      </p>
-
-      <div className="flex justify-end gap-4 mt-8">
-
-        <button
-          onClick={() => setShowLogoutModal(false)}
-          className="px-6 py-3 rounded-xl border border-slate-700 text-gray-300 hover:bg-slate-800 transition"
-        >
-          Cancel
-        </button>
-
-        <button
-          onClick={handleLogout}
-          className="px-6 py-3 rounded-xl bg-violet-600 hover:bg-violet-500 shadow-[0_0_18px_rgba(139,92,246,0.6)] text-white font-semibold transition-all duration-300"
-        >
-          Logout
-        </button>
-
-      </div>
-
-    </div>
-
-  </div>
-)}
+              <button
+                onClick={handleLogout}
+                className="px-6 py-3 rounded-xl bg-violet-600 hover:bg-violet-500 shadow-[0_0_18px_rgba(139,92,246,0.6)] text-white font-semibold transition-all duration-300"
+              >
+                Logout
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

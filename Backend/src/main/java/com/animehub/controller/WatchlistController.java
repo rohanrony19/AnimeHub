@@ -51,6 +51,21 @@ public class WatchlistController {
 	    return watchlistService.addToWatchlist(user, anime);
 	}
 
+	@PostMapping("/anime/{animeId}")
+	public Watchlist addToWatchlistByAnimeId(
+	        @PathVariable Long animeId,
+	        Authentication authentication) {
+
+	    String username = authentication.getName();
+
+	    User user = userRepository.findByEmail(username)
+	            .orElseThrow(() -> new RuntimeException("User not found"));
+
+	    Anime anime = animeService.findAnimeEntity(animeId);
+
+	    return watchlistService.addToWatchlist(user, anime);
+	}
+	
     @GetMapping
     public List<WatchlistResponse> getWatchlist(Authentication authentication) {
 
@@ -75,5 +90,33 @@ public class WatchlistController {
         watchlistService.removeWatchlist(user, animeId);
 
         return "Anime removed from watchlist successfully";
+    }
+    
+    @DeleteMapping("/anime/{animeId}")
+    public String removeFromWatchlistByAnimeId(
+            @PathVariable Long animeId,
+            Authentication authentication) {
+
+        String username = authentication.getName();
+
+        User user = userRepository.findByEmail(username)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        watchlistService.removeWatchlistByAnimeId(user, animeId);
+
+        return "Anime removed from watchlist successfully";
+    }
+    
+    @GetMapping("/{animeId}")
+    public boolean isInWatchlist(
+            @PathVariable Long animeId,
+            Authentication authentication) {
+
+        String username = authentication.getName();
+
+        User user = userRepository.findByEmail(username)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        return watchlistService.isInWatchlist(user, animeId);
     }
 }

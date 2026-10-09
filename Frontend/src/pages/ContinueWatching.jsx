@@ -15,7 +15,7 @@ function ContinueWatching() {
 
       setProgress(Array.isArray(data) ? data : [data]);
     } catch (error) {
-      console.log(error);
+      toast.error("Failed to load continue watching.");
     }
   };
 

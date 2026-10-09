@@ -3,7 +3,13 @@ package com.animehub.controller;
 import java.util.List;
 
 import org.springframework.security.core.Authentication;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
 import com.animehub.dto.ContinueWatchingResponse;
 import com.animehub.entity.ContinueWatching;
@@ -25,7 +31,6 @@ public class ContinueWatchingController {
             ContinueWatchingService continueWatchingService,
             EpisodeService episodeService,
             UserRepository userRepository) {
-
         this.continueWatchingService = continueWatchingService;
         this.episodeService = episodeService;
         this.userRepository = userRepository;
@@ -61,20 +66,21 @@ public class ContinueWatchingController {
 
         return continueWatchingService.getContinueWatching(user);
     }
-    
-    @DeleteMapping("/{episodeId}")
+
+    @DeleteMapping("/{animeId}")
     public String removeContinueWatching(
-            @PathVariable Long episodeId,
+
+            @PathVariable Long animeId,
+
             Authentication authentication) {
 
         String email = authentication.getName();
 
         User user = userRepository.findByEmail(email)
+
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
-        Episode episode = episodeService.getById(episodeId);
-
-        continueWatchingService.removeProgress(user, episode);
+        continueWatchingService.removeProgress(user, animeId);
 
         return "Continue watching removed successfully";
     }

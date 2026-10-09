@@ -15,7 +15,7 @@ function Favorites() {
       const data = await getFavorites();
       setFavorites(data);
     } catch (error) {
-      console.log(error);
+      toast.error("Failed to load favorites.");
     }
   };
 
@@ -25,8 +25,6 @@ function Favorites() {
 
       fetchFavorites();
     } catch (error) {
-      console.log(error);
-
       toast.error("Failed to remove favorite");
     }
   };

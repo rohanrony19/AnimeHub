@@ -1,31 +1,25 @@
 import { FaPlay } from "react-icons/fa";
 import { Link } from "react-router-dom";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useLayoutEffect, useState, useRef } from "react";
 import { useParams } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import toast from "react-hot-toast";
-import {
-  getDatabaseAnimeById,
-  getDatabaseAnimeByMalId,
-} from "../services/anime/databaseAnimeService";
-import {
-  getEpisodesByAnime,
-  getEpisodesBySeason,
-} from "../services/anime/databaseEpisodeService";
+import { getDatabaseAnimeById } from "../services/anime/databaseAnimeService";
+import { getEpisodesByAnime } from "../services/anime/databaseEpisodeService";
 import {
   getAnimeCharacters,
   getAnimeRecommendations,
 } from "../services/anime/jikanService";
 import {
-  addFavorite,
-  removeFavorite,
-  getFavorites,
+  addFavoriteByAnimeId,
+  removeFavoriteByAnimeId,
+  getFavoriteStatus,
 } from "../services/user/favoriteService";
 
 import {
-  addWatchlist,
-  removeWatchlist,
-  getWatchlist,
+  addWatchlistByAnimeId,
+  removeWatchlistByAnimeId,
+  getWatchlistStatus,
 } from "../services/user/watchlistService";
 import {
   getReviews,
@@ -35,13 +29,15 @@ import {
 
 function DatabaseAnimeDetails() {
   const { id } = useParams();
+  useLayoutEffect(() => {
+    window.scrollTo(0, 0);
+  }, [id]);
 
   const [anime, setAnime] = useState(null);
   const videoRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [episodes, setEpisodes] = useState([]);
-  const [selectedEpisode, setSelectedEpisode] = useState(null);
-  const [episodePage, setEpisodePage] = useState(1);
+  const [selectedSeason, setSelectedSeason] = useState(1);
   const [activeTab, setActiveTab] = useState("overview");
   const [characters, setCharacters] = useState([]);
   const [recommendations, setRecommendations] = useState([]);
@@ -71,18 +67,17 @@ function DatabaseAnimeDetails() {
 
         const avg = await getAverageRating(animeData.id);
         setAverageRating(avg);
+      } catch (error) {}
 
-        const favorites = await getFavorites();
+      try {
+        const favoriteStatus = await getFavoriteStatus(animeData.id);
+        setIsFavorite(favoriteStatus);
+      } catch (error) {}
 
-        setIsFavorite(favorites.some((fav) => fav.malId === animeData.malId));
-
-        const watchlist = await getWatchlist();
-
-        setIsWatchlist(
-          watchlist.some((item) => item.malId === animeData.malId),
-        );
-      } catch (error) {
-      }
+      try {
+        const watchlistStatus = await getWatchlistStatus(animeData.id);
+        setIsWatchlist(watchlistStatus);
+      } catch (error) {}
 
       try {
         if (animeData.malId) {
@@ -94,8 +89,7 @@ function DatabaseAnimeDetails() {
           );
           setRecommendations(recommendationData);
         }
-      } catch (error) {
-      }
+      } catch (error) {}
     };
 
     fetchAnime();
@@ -110,16 +104,22 @@ function DatabaseAnimeDetails() {
 
         setEpisodes(data);
 
-        if (data.length > 0 && !selectedEpisode) {
-          setSelectedEpisode(data[0].id);
-        }
+        const seasons = [
+          ...new Set(
+            data
+              .map((episode) => episode.seasonNumber)
+              .filter((season) => season != null),
+          ),
+        ].sort((a, b) => a - b);
+
+        setSelectedSeason(seasons[0] ?? 1);
       } catch (error) {
-        console.log(error);
+        toast.error("Failed to fetch episodes");
       }
     };
 
     fetchEpisodes();
-  }, [anime, episodePage]);
+  }, [anime]);
 
   if (!anime) {
     return (
@@ -143,7 +143,7 @@ function DatabaseAnimeDetails() {
 
             {/* Right Skeleton */}
             <div className="bg-slate-900 rounded-3xl p-6 animate-pulse">
-              <div className="h-[550px] bg-slate-800 rounded-3xl"></div>
+              <div className="w-[90%] mx-auto h-[550px] bg-slate-800 rounded-3xl"></div>
             </div>
           </div>
         </div>
@@ -154,26 +154,14 @@ function DatabaseAnimeDetails() {
   const handleFavorite = async () => {
     try {
       if (isFavorite) {
-        await removeFavorite(anime.malId);
+        await removeFavoriteByAnimeId(anime.id);
 
         setIsFavorite(false);
         toast.success("Removed from Favorites ❤️");
         return;
       }
 
-      await addFavorite({
-        malId: anime.malId,
-        title: anime.title,
-        description: anime.description,
-        genre: anime.genre,
-        releaseYear: anime.releaseYear,
-        rating: anime.rating,
-        posterUrl: anime.posterUrl,
-        status: anime.status,
-        featured: anime.featured,
-        heroOrder: anime.heroOrder,
-        bannerUrl: anime.bannerUrl,
-      });
+      await addFavoriteByAnimeId(anime.id);
 
       setIsFavorite(true);
       toast.success("Added to Favorites ❤️");
@@ -185,26 +173,14 @@ function DatabaseAnimeDetails() {
   const handleWatchlist = async () => {
     try {
       if (isWatchlist) {
-        await removeWatchlist(anime.malId);
+        await removeWatchlistByAnimeId(anime.id);
 
         setIsWatchlist(false);
         toast.success("Removed from Watchlist 📌");
         return;
       }
 
-      await addWatchlist({
-        malId: anime.malId,
-        title: anime.title,
-        description: anime.description,
-        genre: anime.genre,
-        releaseYear: anime.releaseYear,
-        rating: anime.rating,
-        posterUrl: anime.posterUrl,
-        status: anime.status,
-        featured: anime.featured,
-        heroOrder: anime.heroOrder,
-        bannerUrl: anime.bannerUrl,
-      });
+      await addWatchlistByAnimeId(anime.id);
 
       setIsWatchlist(true);
       toast.success("Added to Watchlist 📌");
@@ -231,23 +207,8 @@ function DatabaseAnimeDetails() {
 
       toast.success("Review submitted successfully ⭐");
     } catch (error) {
-      console.log(error);
       toast.error(error.response?.data?.message || "Failed to submit review.");
     }
-  };
-
-  const getEmbedUrl = (url) => {
-    if (!url) return null;
-
-    if (url.includes("youtu.be/")) {
-      return `https://www.youtube.com/embed/${url.split("youtu.be/")[1]}`;
-    }
-
-    if (url.includes("watch?v=")) {
-      return url.replace("watch?v=", "embed/");
-    }
-
-    return url;
   };
 
   return (
@@ -298,13 +259,14 @@ function DatabaseAnimeDetails() {
 
           {/* Right Side */}
           <div>
-            <div className=" bg-slate-900 rounded-3xl p-6 shadow-2xl h-full">
+            <div className="bg-slate-900 rounded-3xl p-6 shadow-2xl h-full">
               <div className="relative">
                 {anime.trailerUrl ? (
                   <div className="relative w-[90%] mx-auto">
                     <video
                       ref={videoRef}
                       controls
+                      poster={anime.trailerThumbnailUrl}
                       onPlay={() => setIsPlaying(true)}
                       onPause={() => setIsPlaying(false)}
                       className="w-full h-[550px] rounded-3xl bg-black object-cover"
@@ -579,59 +541,87 @@ function DatabaseAnimeDetails() {
             {/* Episode List */}
             {activeTab === "episodes" && (
               <div className="mt-8 bg-slate-900 rounded-3xl p-6 shadow-2xl">
-                <div className="flex items-center justify-between mb-6">
-                  <button className="bg-[#1b1b1b] px-5 py-3 rounded-xl font-semibold hover:bg-[#2a2a2a] transition">
-                    Season 1 ▼
-                  </button>
+                <h2 className="text-2xl font-bold mb-6">Episodes</h2>
+                {episodes.length === 0 ? (
+                  <div className="bg-[#1b1b1b] rounded-2xl p-10 text-center">
+                    <div className="text-6xl mb-4">🎬</div>
 
-                  <span className="text-gray-400">
-                    {episodes.length} Episodes
-                  </span>
-                </div>
+                    <h3 className="text-2xl font-bold">Episodes Coming Soon</h3>
 
-                {episodes.map((episode) => (
-                  <Link
-                    key={episode.id}
-                    to={`/db/watch/${anime.id}/${episode.id}`}
-                  >
-                    <div className="flex items-center gap-5 p-4 rounded-2xl cursor-pointer transition border border-transparent bg-[#1b1b1b] hover:bg-[#2a2a2a]">
-                      {/* Episode Number */}
-                      <div className="w-14 h-14 flex items-center justify-center rounded-xl bg-black text-xl font-bold">
-                        {String(episode.episodeNumber).padStart(2, "0")}
-                      </div>
+                    <p className="text-gray-400 mt-3">
+                      No episodes have been uploaded for this anime yet.
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex items-center justify-between mb-6">
+                      <select
+                        value={selectedSeason}
+                        onChange={(e) =>
+                          setSelectedSeason(Number(e.target.value))
+                        }
+                        className="bg-[#1b1b1b] px-5 py-3 rounded-xl font-semibold outline-none"
+                      >
+                        {[
+                          ...new Set(
+                            episodes
+                              .map((episode) => episode.seasonNumber)
+                              .filter((season) => season != null),
+                          ),
+                        ]
+                          .sort((a, b) => a - b)
+                          .map((season) => (
+                            <option key={season} value={season}>
+                              Season {season}
+                            </option>
+                          ))}
+                      </select>
 
-                      {/* Episode Info */}
-                      <div>
-                        <h3 className="font-semibold text-lg">
-                          EP {String(episode.episodeNumber).padStart(2, "0")}
-                        </h3>
-
-                        <p className="text-gray-400 text-sm">{episode.title}</p>
-                      </div>
+                      <span className="text-gray-400">
+                        {
+                          episodes.filter(
+                            (episode) =>
+                              episode.seasonNumber === selectedSeason,
+                          ).length
+                        }{" "}
+                        Episodes
+                      </span>
                     </div>
-                  </Link>
-                ))}
 
-                <div className="flex justify-center gap-4 mt-8">
-                  <button
-                    disabled={episodePage === 1}
-                    onClick={() => setEpisodePage((prev) => prev - 1)}
-                    className="bg-orange-500 px-5 py-2 rounded-xl disabled:opacity-50"
-                  >
-                    Previous
-                  </button>
+                    <div className="space-y-3">
+                      {episodes
+                        .filter(
+                          (episode) => episode.seasonNumber === selectedSeason,
+                        )
+                        .map((episode) => (
+                          <Link
+                            key={episode.id}
+                            to={`/db/watch/${anime.id}/${episode.id}`}
+                          >
+                            <div className="flex items-center gap-5 p-4 rounded-2xl cursor-pointer transition border border-transparent bg-[#1b1b1b] hover:bg-[#2a2a2a]">
+                              <div className="w-14 h-14 flex items-center justify-center rounded-xl bg-black text-xl font-bold">
+                                {String(episode.episodeNumber).padStart(2, "0")}
+                              </div>
 
-                  <span className="flex items-center text-gray-400">
-                    Page {episodePage}
-                  </span>
+                              <div>
+                                <h3 className="font-semibold text-lg">
+                                  EP{" "}
+                                  {String(episode.episodeNumber).padStart(
+                                    2,
+                                    "0",
+                                  )}
+                                </h3>
 
-                  <button
-                    onClick={() => setEpisodePage((prev) => prev + 1)}
-                    className="bg-orange-500 px-5 py-2 rounded-xl"
-                  >
-                    Next
-                  </button>
-                </div>
+                                <p className="text-gray-400 text-sm">
+                                  {episode.title}
+                                </p>
+                              </div>
+                            </div>
+                          </Link>
+                        ))}
+                    </div>
+                  </>
+                )}
               </div>
             )}
           </div>

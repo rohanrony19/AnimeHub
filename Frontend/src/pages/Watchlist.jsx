@@ -18,7 +18,7 @@ function Watchlist() {
       const data = await getWatchlist();
       setWatchlist(data);
     } catch (error) {
-      console.log(error);
+      toast.error("Failed to load watchlist.");
     }
   };
 
@@ -27,7 +27,6 @@ function Watchlist() {
       await removeWatchlist(animeId);
       fetchWatchlist();
     } catch (error) {
-      console.log(error);
       toast.error("Failed to remove watchlist");
     }
   };

@@ -1,5 +1,6 @@
 package com.animehub.controller;
 
+import java.io.IOException;
 import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -49,7 +50,7 @@ public class AnimeController {
 
     @GetMapping("/{id}")
     public AnimeResponse getAnime(
-            @PathVariable Long id) {
+            @PathVariable Long id) throws IOException {
 
         return service.getAnimeById(id);
     }
@@ -83,7 +84,7 @@ public class AnimeController {
     @PutMapping("/{id}")
     public AnimeResponse updateAnime(
             @PathVariable Long id,
-            @Valid @RequestBody AnimeRequest anime) {
+            @Valid @RequestBody AnimeRequest anime) throws IOException {
 
         return service.updateAnime(id, anime);
     }

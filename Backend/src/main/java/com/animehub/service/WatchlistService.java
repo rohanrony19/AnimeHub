@@ -50,11 +50,24 @@ public class WatchlistService {
                 .toList();
     }
     
+    public boolean isInWatchlist(User user, Long animeId) {
+        return repository.existsByUserAndAnime_Id(user, animeId);
+    }
+    
     public void removeWatchlist(User user, Long malId) {
 
         Watchlist watchlist = repository.findByUserAndAnime_MalId(user, malId)
                 .orElseThrow(() ->
                         new RuntimeException("Anime not found in favorites"));
+
+        repository.delete(watchlist);
+    }
+    
+    public void removeWatchlistByAnimeId(User user, Long animeId) {
+
+        Watchlist watchlist = repository.findByUserAndAnime_Id(user, animeId)
+                .orElseThrow(() ->
+                        new RuntimeException("Anime not found in watchlist"));
 
         repository.delete(watchlist);
     }

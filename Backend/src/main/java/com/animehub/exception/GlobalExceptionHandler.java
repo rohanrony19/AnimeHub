@@ -2,7 +2,7 @@ package com.animehub.exception;
 
 import java.time.LocalDateTime;
 import org.springframework.web.server.ResponseStatusException;
-
+import org.apache.catalina.connector.ClientAbortException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -100,9 +100,16 @@ public class GlobalExceptionHandler {
             Exception ex,
             HttpServletRequest request) {
 
-        // Full detail goes to the server log only. The client gets a
-        // generic message — no stack trace, no SQL error text, no
-        // internal file paths or class names.
+        Throwable cause = ex;
+
+        while (cause != null) {
+            if (cause instanceof ClientAbortException) {
+                return ResponseEntity.noContent().build();
+            }
+
+            cause = cause.getCause();
+        }
+
         log.error("Unhandled exception on {}", request.getRequestURI(), ex);
 
         ErrorResponse error = new ErrorResponse(
@@ -116,5 +123,10 @@ public class GlobalExceptionHandler {
         return ResponseEntity
                 .status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(error);
+    }
+    
+    @ExceptionHandler(ClientAbortException.class)
+    public ResponseEntity<Void> handleClientAbort(ClientAbortException ex) {
+        return ResponseEntity.noContent().build();
     }
 }

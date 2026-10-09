@@ -56,6 +56,10 @@ public class FavoriteService {
                 .toList();
     }
 
+    public boolean isFavorite(User user, Long animeId) {
+        return repository.existsByUserAndAnime_Id(user, animeId);
+    }
+    
     public void removeFavorite(User user, Long malId) {
 
     	logger.info("Received MAL ID = " + malId);
@@ -69,6 +73,15 @@ public class FavoriteService {
         );
 
         Favorite favorite = repository.findByUserAndMalId(user, malId)
+                .orElseThrow(() ->
+                        new RuntimeException("Anime not found in favorites"));
+
+        repository.delete(favorite);
+    }
+    
+    public void removeFavoriteByAnimeId(User user, Long animeId) {
+
+        Favorite favorite = repository.findByUserAndAnime_Id(user, animeId)
                 .orElseThrow(() ->
                         new RuntimeException("Anime not found in favorites"));
 

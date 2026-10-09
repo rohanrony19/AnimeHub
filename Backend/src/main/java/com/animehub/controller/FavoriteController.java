@@ -47,6 +47,21 @@ public class FavoriteController {
 
         return favoriteService.addFavorite(user, anime);
     }
+    
+    @PostMapping("/anime/{animeId}")
+    public Favorite addFavoriteByAnimeId(
+            @PathVariable Long animeId,
+            Authentication authentication) {
+
+        String username = authentication.getName();
+
+        User user = userRepository.findByEmail(username)
+                .orElseThrow(() -> new BadRequestException("User not found"));
+
+        Anime anime = animeService.findAnimeEntity(animeId);
+
+        return favoriteService.addFavorite(user, anime);
+    }
 
     @GetMapping
     public List<FavoriteResponse> getFavorites(Authentication authentication) {
@@ -72,5 +87,33 @@ public class FavoriteController {
         favoriteService.removeFavorite(user, animeId);
 
         return "Anime removed from favorites successfully";
+    }
+    
+    @DeleteMapping("/anime/{animeId}")
+    public String removeFavoriteByAnimeId(
+            @PathVariable Long animeId,
+            Authentication authentication) {
+
+        String username = authentication.getName();
+
+        User user = userRepository.findByEmail(username)
+                .orElseThrow(() -> new BadRequestException("User not found"));
+
+        favoriteService.removeFavoriteByAnimeId(user, animeId);
+
+        return "Anime removed from favorites successfully";
+    }
+    
+    @GetMapping("/{animeId}")
+    public boolean isFavorite(
+            @PathVariable Long animeId,
+            Authentication authentication) {
+
+        String username = authentication.getName();
+
+        User user = userRepository.findByEmail(username)
+                .orElseThrow(() -> new BadRequestException("User not found"));
+
+        return favoriteService.isFavorite(user, animeId);
     }
 }

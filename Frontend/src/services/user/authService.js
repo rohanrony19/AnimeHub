@@ -18,6 +18,14 @@ export const forgotPassword = async (email) => {
   return response.data;
 };
 
+export const resendOtp = async (email) => {
+  const response = await api.post("/auth/forgot-password", {
+    email,
+  });
+
+  return response.data;
+};
+
 export const verifyOtp = async (data) => {
   const response = await api.post("/auth/verify-otp", data);
 

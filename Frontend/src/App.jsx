@@ -1,7 +1,6 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { Routes, Route } from "react-router-dom";
 import Home from "./pages/Home";
 import JikanAnimeDetails from "./pages/JikanAnimeDetails";
-import EpisodePage from "./pages/EpisodePage";
 import Favorites from "./pages/Favorites";
 import Login from "./pages/Login";
 import Watchlist from "./pages/Watchlist";
@@ -12,13 +11,11 @@ import Register from "./pages/Register";
 import Profile from "./pages/Profile";
 import ForgotPassword from "./pages/ForgotPassword";
 import VerifyOtp from "./pages/VerifyOtp";
-import WatchPage from "./pages/WatchPage";
 import GenrePage from "./pages/GenrePage";
 import SearchPage from "./pages/SearchPage";
 import DatabaseAnimeDetails from "./pages/DatabaseAnimeDetails";
 import DatabaseWatchPage from "./pages/DatabaseWatchPage";
 import ResetPassword from "./pages/ResetPassword";
-import PopularPage from "./pages/PopularPage";
 
 function App() {
   return (
@@ -26,8 +23,6 @@ function App() {
       <Route path="/" element={<Home />} />
 
       <Route path="/jikan/:id" element={<JikanAnimeDetails />} />
-      <Route path="/episode/:id" element={<EpisodePage />} />
-      <Route path="/watch/:animeId/:episodeId" element={<WatchPage />} />
       <Route
         path="/favorites"
         element={
@@ -46,7 +41,7 @@ function App() {
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/verify-otp" element={<VerifyOtp />} />
 
-      <Route path="/genre/:genreId/:genreName" element={<GenrePage />} />
+      <Route path="/genre/:genreName" element={<GenrePage />} />
       <Route path="/search/:keyword" element={<SearchPage />} />
       <Route
         path="/profile"
@@ -56,7 +51,6 @@ function App() {
           </ProtectedRoute>
         }
       />
-      <Route path="/popular" element={<PopularPage />} />
       <Route path="/anime/:id" element={<DatabaseAnimeDetails />} />
       <Route
         path="/watchlist"

@@ -15,6 +15,7 @@ public record AnimeResponse(
         String posterUrl,
         String status,
         String trailerUrl,
+        String trailerThumbnailUrl,
         List<EpisodeResponse> episodes
 
 ) {}

@@ -1,7 +1,7 @@
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { searchAnime } from "../services/anime/jikanService";
+import { searchAnimeList } from "../services/anime/jikanService";
 import { searchDatabaseAnime } from "../services/anime/searchService";
 import { Search, Menu, X } from "lucide-react";
 import { getCurrentUser } from "../services/user/userService";
@@ -15,14 +15,16 @@ import {
 import { User, Heart, Settings, LayoutDashboard, LogOut } from "lucide-react";
 import { Crown } from "lucide-react";
 
-function Navbar({ setSelectedGenre }) {
+function Navbar() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showGenres, setShowGenres] = useState(false);
 
   const [keyword, setKeyword] = useState("");
   const [searchResults, setSearchResults] = useState([]);
   const [databaseResults, setDatabaseResults] = useState([]);
+  const [searchLoading, setSearchLoading] = useState(false);
   const [profileImage, setProfileImage] = useState(
     localStorage.getItem("profileImage"),
   );
@@ -39,31 +41,53 @@ function Navbar({ setSelectedGenre }) {
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
 
-  useEffect(() => {
-    if (keyword.trim() === "") {
-      setSearchResults([]);
+  const navigateToGenre = (path) => {
+  navigate(path, {
+    replace: location.pathname.startsWith("/genre/"),
+  });
+};
+
+useEffect(() => {
+  if (keyword.trim() === "") {
+    setSearchResults([]);
+    setDatabaseResults([]);
+    setSearchLoading(false);
+    return;
+  }
+
+  let cancelled = false;
+
+  const timeout = setTimeout(async () => {
+    setSearchLoading(true);
+
+    const [dbResult, externalResult] = await Promise.allSettled([
+      searchDatabaseAnime(keyword),
+      searchAnimeList(keyword),
+    ]);
+
+    // Ignore results from an older search
+    if (cancelled) return;
+
+    if (dbResult.status === "fulfilled") {
+      setDatabaseResults(dbResult.value);
+    } else {
       setDatabaseResults([]);
-      return;
     }
 
-    const timeout = setTimeout(async () => {
-      try {
-        const dbAnime = await searchDatabaseAnime(keyword);
-        setDatabaseResults(dbAnime);
-      } catch (error) {
-        setDatabaseResults([]);
-      }
+    if (externalResult.status === "fulfilled") {
+      setSearchResults(externalResult.value);
+    } else {
+      setSearchResults([]);
+    }
 
-      try {
-        const jikanAnime = await searchAnime(keyword);
-        setSearchResults(jikanAnime);
-      } catch (error) {
-        setSearchResults([]);
-      }
-    }, 500);
+    setSearchLoading(false);
+  }, 500);
 
-    return () => clearTimeout(timeout);
-  }, [keyword]);
+  return () => {
+    cancelled = true;
+    clearTimeout(timeout);
+  };
+}, [keyword]);
 
   const mergedResults = [
     ...databaseResults,
@@ -109,7 +133,7 @@ function Navbar({ setSelectedGenre }) {
         const user = await getCurrentUser();
         setCurrentUser(user);
         setProfileImage(user.profileImage);
-        
+
         localStorage.setItem("profileImage", user.profileImage);
       } catch (error) {
         setProfileImage("/default-avatar.png");
@@ -170,9 +194,15 @@ function Navbar({ setSelectedGenre }) {
           </button>
         )}
 
-        {mergedResults.length > 0 && (
-          <div className="absolute top-14 w-full bg-slate-900 rounded-2xl shadow-xl overflow-hidden z-50">
+        {(searchLoading || mergedResults.length > 0) && (
+          <div className="absolute top-14 w-full bg-slate-900 rounded-2xl shadow-xl overflow-hidden z-50 max-h-96 overflow-y-auto">
+            {searchLoading && (
+  <div className="p-4 text-center text-gray-400">
+    Searching anime...
+  </div>
+)}
             {mergedResults.map((anime) => (
+              
               <Link
                 key={anime.id || anime.mal_id}
                 to={anime.id ? `/anime/${anime.id}` : `/jikan/${anime.mal_id}`}
@@ -184,7 +214,11 @@ function Navbar({ setSelectedGenre }) {
                 }}
               >
                 <img
-                  src={anime.posterUrl || anime.images?.jpg?.image_url}
+                  src={
+  anime.posterUrl ||
+  anime.images?.jpg?.large_image_url ||
+  anime.images?.jpg?.image_url
+}
                   alt={anime.title}
                   className="w-12 h-16 rounded-lg object-cover"
                 />
@@ -222,7 +256,7 @@ function Navbar({ setSelectedGenre }) {
         absolute
         top-12
         right-0
-        w-[360px]
+        w-[380px]
         rounded-3xl
         bg-[#111827]
         border
@@ -241,14 +275,16 @@ function Navbar({ setSelectedGenre }) {
                   <button
                     key={genre.id}
                     onClick={() => {
-                      if (genre.name === "Popular") {
-                        navigate("/popular");
-                      } else {
-                        navigate(`/genre/${genre.id}/${genre.name}`);
-                      }
+  if (genre.name === "Top Anime") {
+  navigateToGenre("/genre/top-anime");
+} else if (genre.name === "Popular") {
+  navigateToGenre("/genre/popular");
+} else {
+  navigateToGenre(`/genre/${genre.name.toLowerCase()}`);
+}
 
-                      setShowGenres(false);
-                    }}
+  setShowGenres(false);
+}}
                     className="
               flex
               items-center
@@ -700,9 +736,16 @@ function Navbar({ setSelectedGenre }) {
                 </button>
               )}
             </div>
-            {mergedResults.length > 0 && (
-              <div className="mt-3 bg-slate-800 rounded-2xl overflow-hidden max-h-72 overflow-y-auto">
-                {mergedResults.map((anime) => (
+            {(searchLoading || mergedResults.length > 0) && (
+  <div className="mt-3 bg-slate-800 rounded-2xl overflow-hidden max-h-72 overflow-y-auto">
+
+    {searchLoading && (
+      <div className="p-4 text-center text-gray-400">
+        Searching anime...
+      </div>
+    )}
+
+    {mergedResults.map((anime) => (
                   <Link
                     key={anime.id || anime.mal_id}
                     to={
@@ -717,7 +760,11 @@ function Navbar({ setSelectedGenre }) {
                     className="flex items-center gap-3 p-3 border-b border-slate-700 hover:bg-slate-700"
                   >
                     <img
-                      src={anime.posterUrl || anime.images?.jpg?.image_url}
+                      src={
+  anime.posterUrl ||
+  anime.images?.jpg?.large_image_url ||
+  anime.images?.jpg?.image_url
+}
                       alt={anime.title}
                       className="w-12 h-16 rounded-lg object-cover"
                     />
@@ -754,15 +801,17 @@ function Navbar({ setSelectedGenre }) {
                     <button
                       key={genre.id}
                       onClick={() => {
-                        setShowMobileMenu(false);
-                        setShowGenres(false);
+  setShowMobileMenu(false);
+  setShowGenres(false);
 
-                        if (genre.name === "Popular") {
-                          navigate("/popular");
-                        } else {
-                          navigate(`/genre/${genre.id}/${genre.name}`);
-                        }
-                      }}
+  if (genre.name === "Top Anime") {
+  navigateToGenre("/genre/top-anime");
+} else if (genre.name === "Popular") {
+  navigateToGenre("/genre/popular");
+} else {
+  navigateToGenre(`/genre/${genre.name.toLowerCase()}`);
+}
+}}
                       className="text-left text-gray-300 hover:text-violet-400"
                     >
                       {genre.icon} {genre.name}

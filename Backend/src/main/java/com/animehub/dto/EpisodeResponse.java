@@ -8,6 +8,7 @@ public record EpisodeResponse(
 	    int episodeNumber,
 	    String title,
 	    String videoUrl,
+	    String thumbnailUrl,
 	    int duration
 
 	) {}

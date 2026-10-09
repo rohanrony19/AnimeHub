@@ -63,4 +63,5 @@ public class Anime {
 	
 	private String trailerUrl;
 	
+	private String trailerThumbnailUrl;
 }

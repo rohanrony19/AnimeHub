@@ -1,7 +1,10 @@
 package com.animehub.controller;
 
+import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
@@ -25,23 +28,52 @@ public class EpisodeController {
     @PostMapping("/{animeId}")
     public EpisodeResponse saveEpisode(
             @PathVariable Long animeId,
-            @Valid @RequestBody EpisodeRequest request) {
+            @Valid @RequestBody EpisodeRequest request) throws IOException {
 
         return service.saveEpisode(animeId, request);
     }
 
     @GetMapping("/anime/{animeId}")
     public List<EpisodeResponse> getEpisodes(
-            @PathVariable Long animeId) {
+            @PathVariable Long animeId) throws IOException {
 
         return service.getEpisodesByAnime(animeId);
     }
 
     @GetMapping("/{id}")
     public EpisodeResponse getEpisodeById(
-            @PathVariable Long id) {
+            @PathVariable Long id) throws IOException {
 
         return service.getEpisodeById(id);
+    }
+    
+    @PreAuthorize("hasRole('ADMIN')")
+    @PostMapping("/{episodeId}/thumbnail")
+    public ResponseEntity<Map<String, String>> regenerateEpisodeThumbnail(
+            @PathVariable Long episodeId) throws IOException {
+
+        EpisodeResponse episode =
+                service.regenerateEpisodeThumbnail(episodeId);
+
+        return ResponseEntity.ok(
+                Map.of(
+                        "thumbnailUrl",
+                        episode.thumbnailUrl()
+                )
+        );
+    }
+    
+    @PreAuthorize("hasRole('ADMIN')")
+    @PostMapping("/thumbnail/all")
+    public ResponseEntity<Map<String, Integer>> regenerateAllEpisodeThumbnails()
+            throws IOException {
+
+        int regenerated =
+                service.regenerateAllEpisodeThumbnails();
+
+        return ResponseEntity.ok(
+                Map.of("regenerated", regenerated)
+        );
     }
 
     @GetMapping("/{id}/watch")
@@ -63,7 +95,7 @@ public class EpisodeController {
     @PutMapping("/{id}")
     public EpisodeResponse updateEpisode(
             @PathVariable Long id,
-            @Valid @RequestBody EpisodeRequest request) {
+            @Valid @RequestBody EpisodeRequest request) throws IOException {
 
         return service.updateEpisode(id, request);
     }
@@ -76,7 +108,7 @@ public class EpisodeController {
     @GetMapping("/anime/{animeId}/season/{season}")
     public List<EpisodeResponse> getEpisodesBySeason(
             @PathVariable Long animeId,
-            @PathVariable Integer season) {
+            @PathVariable Integer season) throws IOException {
 
         return service.getEpisodesBySeason(animeId, season);
     }
@@ -95,4 +127,5 @@ public class EpisodeController {
 
         return service.getProgress(episodeId);
     }
+    
 }

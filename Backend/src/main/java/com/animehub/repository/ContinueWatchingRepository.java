@@ -5,15 +5,22 @@ import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import com.animehub.entity.Anime;
 import com.animehub.entity.ContinueWatching;
-import com.animehub.entity.Episode;
 import com.animehub.entity.User;
 
-public interface ContinueWatchingRepository extends JpaRepository<ContinueWatching, Long>{
+public interface ContinueWatchingRepository
+        extends JpaRepository<ContinueWatching, Long> {
 
-	List<ContinueWatching> findByUser(User user);
+	List<ContinueWatching> findByUserOrderByUpdatedAtDesc(User user);
 
-	Optional<ContinueWatching> findByUserAndEpisode(User user, Episode episode);
-	
-	void deleteByUserAndEpisode(User user, Episode episode);
+    Optional<ContinueWatching> findByUserAndAnime(
+            User user,
+            Anime anime);
+    
+    void deleteByUserAndAnimeId(
+
+            User user,
+
+            Long animeId);
 }

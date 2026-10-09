@@ -16,4 +16,13 @@ public interface EpisodeRepository extends JpaRepository<Episode, Long>{
 	List<Episode> findByAnimeAndSeasonNumberOrderByEpisodeNumberAsc(
 	        Anime anime,
 	        Integer seasonNumber);
+	
+	Episode findByAnimeAndSeasonNumberAndEpisodeNumber(
+	        Anime anime,
+	        Integer seasonNumber,
+	        Integer episodeNumber);
+	
+	boolean existsByVideoUrlAndIdNot(String videoUrl, Long id);
+
+	boolean existsByThumbnailUrlAndIdNot(String thumbnailUrl, Long id);
 }

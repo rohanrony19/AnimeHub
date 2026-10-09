@@ -26,5 +26,6 @@ public record AnimeRequest(
 
         String posterUrl,
         String status,
-        String trailerUrl
+        String trailerUrl,
+        String trailerThumbnailUrl
 ) {}

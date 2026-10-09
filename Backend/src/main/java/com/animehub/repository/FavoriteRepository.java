@@ -15,8 +15,12 @@ public interface FavoriteRepository extends JpaRepository<Favorite, Long>{
 	List<Favorite> findByUser(User user);
 
     boolean existsByUserAndAnime(User user, Anime anime);
+    
+    boolean existsByUserAndAnime_Id(User user, Long animeId);
 
     void deleteByUserAndAnime(User user, Anime anime);
+    
+    Optional<Favorite> findByUserAndAnime_Id(User user, Long animeId);
     
     @Query("""
     		SELECT f
