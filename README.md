@@ -180,40 +180,38 @@ AnimeHub follows a layered full-stack architecture.
       │     RDS     │   │   Storage   │   │ Anime Data  │
       └─────────────┘   └─────────────┘   └─────────────┘
 
+```
+
 # 🖼️ Screenshots
 
 ## 🏠 Home Page
 
-![AnimeHub Home Page](PASTE-HOME-SCREENSHOT-HERE)
-
-## 🔥 Trending Anime
-
-![Trending Anime](PASTE-TRENDING-SCREENSHOT-HERE)
+![AnimeHub Home Page](Screenshots/home.png)
 
 ## 🎬 Anime Details
 
-![Anime Details](PASTE-ANIME-DETAILS-SCREENSHOT-HERE)
+![Anime Details](Screenshots/anime-details.png)
 
 ## ▶️ Watch Page
 
-![Watch Page](PASTE-WATCH-PAGE-SCREENSHOT-HERE)
+![Watch Page](Screenshots/watch-page.png)
 
 ## 🔎 Search & Browse
 
-![Search and Browse](PASTE-SEARCH-SCREENSHOT-HERE)
-
-## ❤️ Favorites & Watchlist
-
-![Favorites and Watchlist](PASTE-FAVORITES-SCREENSHOT-HERE)
+![Search and Browse](Screenshots/search.png)
 
 ## 👤 User Profile
 
-![User Profile](PASTE-PROFILE-SCREENSHOT-HERE)
+![User Profile](Screenshots/profile.png)
+
+## 🔄 Continue Watching
+
+![Continue Watching](Screenshots/continue-watching.png)
+
+## 🎞️ Anime Cards
+
+![Anime Cards](Screenshots/cards.png)
 
 ## 👑 Admin Dashboard
 
-![Admin Dashboard](PASTE-ADMIN-DASHBOARD-SCREENSHOT-HERE)
-
-## 🎞️ Episode Management
-
-![Episode Management](PASTE-EPISODE-MANAGEMENT-SCREENSHOT-HERE)
+![Admin Dashboard](Screenshots/admin-dashboard.png)
