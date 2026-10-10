@@ -44,6 +44,8 @@ jobs:
             --document-name "AWS-RunShellScript" \
             --parameters 'commands=[
               "aws s3 cp s3://${{ secrets.AWS_S3_BUCKET }}/deploy/animehub-${{ github.sha }}.jar /home/ubuntu/AnimeHub/Backend/target/animehub-0.0.1-SNAPSHOT.jar",
+              "sudo mkdir -p /etc/animehub",
+              "sudo aws ssm get-parameters-by-path --path /animehub --with-decryption --query \"Parameters[*].[Name,Value]\" --output text | sed \"s#^/animehub/##\" | sed \"s/[[:space:]]\\+/=/\" | sudo tee /etc/animehub/env > /dev/null",
               "sudo systemctl restart animehub",
               "sudo systemctl is-active animehub"
             ]' \
