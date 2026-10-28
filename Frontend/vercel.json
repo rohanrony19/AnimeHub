@@ -1,6 +1,10 @@
 {
   "rewrites": [
     {
+      "source": "/sitemap.xml",
+      "destination": "https://animehub-rony.duckdns.org/api/anime/sitemap"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
