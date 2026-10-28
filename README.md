@@ -2,7 +2,7 @@
 
 A full-stack anime streaming platform built with **React.js, Spring Boot, PostgreSQL, JWT Authentication, and AWS**.
 
-## 📌 About the Project
+## 📌 About the Project 
 
 AnimeHub is a full-stack anime streaming platform where users can browse anime, watch episodes, manage favorites and watchlists, rate and review anime, and continue watching from where they left off.
 
