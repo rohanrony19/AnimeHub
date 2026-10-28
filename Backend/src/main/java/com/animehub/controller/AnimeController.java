@@ -119,4 +119,23 @@ public class AnimeController {
         return service.getAnimeByMalId(malId);
     }
 
+    @GetMapping(value = "/sitemap", produces = "application/xml")
+    public String getSitemap() {
+    List<AnimeResponse> animeList = service.getAllAnime();
+
+    StringBuilder xml = new StringBuilder();
+    xml.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>");
+    xml.append("<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">");
+
+    xml.append("<url><loc>https://www.anime-hub.in/</loc></url>");
+
+    for (AnimeResponse anime : animeList) {
+        xml.append("<url><loc>https://www.anime-hub.in/anime/")
+           .append(anime.id())
+           .append("</loc></url>");
+    }
+
+    xml.append("</urlset>");
+    return xml.toString();
+}
 }
